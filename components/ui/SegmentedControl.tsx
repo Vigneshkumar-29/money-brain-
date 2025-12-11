@@ -19,7 +19,7 @@ export default function SegmentedControl({ values, selectedIndex, onChange }: Se
             className={`flex-1 py-2.5 rounded-xl items-center active:scale-95 ${isSelected ? 'bg-primary shadow-md' : ''}`}
             activeOpacity={0.7}
           >
-            <Text className={`font-semibold text-sm ${isSelected ? 'text-white' : 'text-text-secondary'}`}>
+            <Text className={`font-body font-semibold text-sm ${isSelected ? 'text-white' : 'text-text-secondary'}`}>
               {value}
             </Text>
           </TouchableOpacity>

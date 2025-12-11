@@ -7,9 +7,19 @@ import TransactionPreview from '../../components/dashboard/TransactionPreview';
 import FAB from '../../components/ui/FAB';
 import FadeInView from '../../components/ui/FadeInView';
 import { useRouter } from 'expo-router';
+import { useTransactions } from '../../context/TransactionContext';
 
 export default function Dashboard() {
   const router = useRouter();
+
+  const { totals } = useTransactions();
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background-light dark:bg-background-dark">
@@ -17,31 +27,31 @@ export default function Dashboard() {
         <FadeInView delay={0}>
           <Text className="text-3xl font-display font-bold text-text-primary dark:text-text-dark mb-8">Dashboard</Text>
         </FadeInView>
-        
+
         <FadeInView delay={50} className="flex-row justify-between mb-4">
-          <MetricCard 
-            title="Total Balance" 
-            amount="$12,450.00" 
-            icon={Wallet} 
-            type="balance" 
+          <MetricCard
+            title="Total Balance"
+            amount={formatCurrency(totals.balance)}
+            icon={Wallet}
+            type="balance"
           />
         </FadeInView>
 
         <View className="flex-row justify-between mb-4">
           <FadeInView delay={100} className="flex-1">
-            <MetricCard 
-              title="Income" 
-              amount="$4,250.00" 
-              icon={TrendingUp} 
-              type="income" 
+            <MetricCard
+              title="Income"
+              amount={formatCurrency(totals.income)}
+              icon={TrendingUp}
+              type="income"
             />
           </FadeInView>
           <FadeInView delay={150} className="flex-1">
-            <MetricCard 
-              title="Expenses" 
-              amount="$1,850.00" 
-              icon={TrendingDown} 
-              type="expense" 
+            <MetricCard
+              title="Expenses"
+              amount={formatCurrency(totals.expense)}
+              icon={TrendingDown}
+              type="expense"
             />
           </FadeInView>
         </View>
@@ -49,8 +59,8 @@ export default function Dashboard() {
         <FadeInView delay={200}>
           <TransactionPreview />
         </FadeInView>
-        
-        <View className="h-32" /> 
+
+        <View className="h-32" />
       </ScrollView>
       <FAB onPress={() => router.push('/transaction-modal')} />
     </SafeAreaView>

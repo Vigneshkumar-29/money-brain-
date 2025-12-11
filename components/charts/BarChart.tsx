@@ -26,7 +26,7 @@ export default function BarChart({ data, height = 220, barColor = '#2ECC71' }: B
           const barHeight = (item.value / maxVal) * (height - 30);
           const x = index * (barWidth + spacing);
           const y = height - barHeight - 20;
-          
+
           return (
             <React.Fragment key={index}>
               <Rect
@@ -44,6 +44,7 @@ export default function BarChart({ data, height = 220, barColor = '#2ECC71' }: B
                 fill="#6B7280"
                 fontWeight="600"
                 textAnchor="middle"
+                fontFamily="Manrope-SemiBold"
               >
                 {item.label}
               </SvgText>
