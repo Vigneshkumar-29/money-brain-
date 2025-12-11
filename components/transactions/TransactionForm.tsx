@@ -151,7 +151,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
             <View className="flex-row items-center">
               <Text className={`text-3xl font-mono font-bold ${amount ? 'text-primary' : 'text-gray-400'
                 }`}>
-                $
+                ₹
               </Text>
               <TextInput
                 className="flex-1 ml-2 text-3xl font-mono font-bold text-text-primary dark:text-text-dark"
@@ -185,8 +185,8 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
                   key={cat.id}
                   onPress={() => setSelectedCategory(cat.id)}
                   className={`flex-1 min-w-[30%] bg-card-light dark:bg-card-dark border rounded-2xl p-4 active:scale-95 shadow-md ${isSelected
-                      ? 'border-primary'
-                      : 'border-gray-100 dark:border-gray-800'
+                    ? 'border-primary'
+                    : 'border-gray-100 dark:border-gray-800'
                     }`}
                   style={{ minWidth: '30%' }}
                 >
@@ -291,8 +291,8 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
           onPress={handleSave}
           disabled={!amount || !selectedCategory || loading}
           className={`py-4 rounded-2xl items-center justify-center active:scale-95 shadow-md ${amount && selectedCategory
-              ? 'bg-primary'
-              : 'bg-gray-200 dark:bg-gray-800'
+            ? 'bg-primary'
+            : 'bg-gray-200 dark:bg-gray-800'
             }`}
         >
           {loading ? (
