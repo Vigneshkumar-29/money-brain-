@@ -1,39 +1,100 @@
-import { View, Text, TextInput, Pressable, ScrollView, Platform, ActivityIndicator } from 'react-native';
-import React, { useState } from 'react';
+import { View, Text, TextInput, ScrollView, Platform, ActivityIndicator, Modal, Pressable, StyleSheet, TouchableWithoutFeedback } from 'react-native';
+import React, { useState, useMemo } from 'react';
 import { useTransactions, Transaction } from '../../context/TransactionContext';
 import {
   X,
   Utensils,
   ShoppingBag,
-  Car, // flight_takeoff -> Plane if available, else Car/Map
-  Zap, // bolt
-  Heart, // cardiology -> Heart
+  Car,
+  Zap,
+  Heart,
   CheckCircle,
-  Delete, // backspace
+  Delete,
   ArrowUp,
   ArrowDown,
-  ArrowLeft
+  ArrowLeft,
+  Home,
+  Smartphone,
+  Coffee,
+  Gift,
+  Plane,
+  Film,
+  Dumbbell,
+  GraduationCap,
+  Briefcase,
+  TrendingUp,
+  DollarSign,
+  Users,
+  HandCoins
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Mapping categories to icons matching the design request as close as possible with Lucide
-const CATEGORIES_CONFIG: Record<string, { label: string, icon: any }> = {
-  food: { label: 'Food', icon: Utensils },
-  travel: { label: 'Travel', icon: Car }, // Using Car as generic travel or Plane if available in specific version
-  bills: { label: 'Bills', icon: Zap },
-  shopping: { label: 'Shopping', icon: ShoppingBag },
-  health: { label: 'Health', icon: Heart },
+// Custom button component without className to avoid navigation context issues
+const TypeButton: React.FC<{
+  label: string;
+  isSelected: boolean;
+  onPress: () => void;
+}> = ({ label, isSelected, onPress }) => {
+  return (
+    <TouchableWithoutFeedback onPress={onPress}>
+      <View
+        style={[
+          styles.typeButton,
+          isSelected ? styles.typeButtonSelected : styles.typeButtonUnselected,
+        ]}
+      >
+        <Text
+          style={[
+            styles.typeButtonText,
+            isSelected ? styles.typeButtonTextSelected : styles.typeButtonTextUnselected,
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
+    </TouchableWithoutFeedback>
+  );
 };
 
-const EXPENSE_CATEGORIES = Object.keys(CATEGORIES_CONFIG).map(id => ({ id, ...CATEGORIES_CONFIG[id] }));
+// Comprehensive category configurations for each transaction type
+const EXPENSE_CATEGORIES = [
+  { id: 'food', label: 'Food & Dining', icon: Utensils },
+  { id: 'shopping', label: 'Shopping', icon: ShoppingBag },
+  { id: 'transport', label: 'Transport', icon: Car },
+  { id: 'bills', label: 'Bills & Utilities', icon: Zap },
+  { id: 'health', label: 'Healthcare', icon: Heart },
+  { id: 'home', label: 'Home & Rent', icon: Home },
+  { id: 'entertainment', label: 'Entertainment', icon: Film },
+  { id: 'education', label: 'Education', icon: GraduationCap },
+  { id: 'fitness', label: 'Fitness', icon: Dumbbell },
+  { id: 'travel', label: 'Travel', icon: Plane },
+  { id: 'gifts', label: 'Gifts', icon: Gift },
+  { id: 'phone', label: 'Phone & Internet', icon: Smartphone },
+];
 
-// For now, mocking categories for other types if needed, or reusing
 const INCOME_CATEGORIES = [
-  { id: 'salary', label: 'Salary', icon: ArrowDown },
-  { id: 'freelance', label: 'Freelance', icon: ArrowUp },
+  { id: 'salary', label: 'Salary', icon: Briefcase },
+  { id: 'freelance', label: 'Freelance', icon: Coffee },
+  { id: 'business', label: 'Business', icon: TrendingUp },
+  { id: 'investment', label: 'Investment', icon: DollarSign },
+  { id: 'bonus', label: 'Bonus', icon: Gift },
+  { id: 'refund', label: 'Refund', icon: ArrowDown },
+  { id: 'other_income', label: 'Other Income', icon: DollarSign },
+];
+
+const LENT_CATEGORIES = [
+  { id: 'lent_friend', label: 'Lent to Friend', icon: Users },
+  { id: 'lent_family', label: 'Lent to Family', icon: Heart },
+  { id: 'lent_other', label: 'Lent to Other', icon: HandCoins },
+];
+
+const BORROWED_CATEGORIES = [
+  { id: 'borrowed_friend', label: 'Borrowed from Friend', icon: Users },
+  { id: 'borrowed_family', label: 'Borrowed from Family', icon: Heart },
+  { id: 'borrowed_bank', label: 'Bank Loan', icon: Briefcase },
+  { id: 'borrowed_other', label: 'Borrowed from Other', icon: HandCoins },
 ];
 
 interface TransactionFormProps {
@@ -51,8 +112,36 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
   const [amount, setAmount] = useState(initialTransaction?.amount.toString() || '');
   const [selectedCategory, setSelectedCategory] = useState(initialTransaction?.category || 'food');
   const [date, setDate] = useState(initialTransaction?.date ? new Date(initialTransaction.date) : new Date());
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   const insets = useSafeAreaInsets();
+
+  // Get categories based on selected type
+  const currentCategories = useMemo(() => {
+    switch (type) {
+      case 'income':
+        return INCOME_CATEGORIES;
+      case 'lent':
+        return LENT_CATEGORIES;
+      case 'borrowed':
+        return BORROWED_CATEGORIES;
+      default:
+        return EXPENSE_CATEGORIES;
+    }
+  }, [type]);
+
+  // Update selected category when type changes
+  const handleTypeChange = (newType: 'expense' | 'income' | 'lent' | 'borrowed') => {
+    setType(newType);
+    // Set default category for the new type
+    const defaultCategories = {
+      expense: 'food',
+      income: 'salary',
+      lent: 'lent_friend',
+      borrowed: 'borrowed_friend'
+    };
+    setSelectedCategory(defaultCategories[newType]);
+  };
 
   const handleKeyPress = (key: string) => {
     if (key === 'backspace') {
@@ -73,25 +162,41 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
 
     setLoading(true);
     try {
+      console.log('Saving transaction...', {
+        isEdit: !!initialTransaction,
+        id: initialTransaction?.id,
+        amount: parseFloat(amount),
+        category: selectedCategory,
+        type
+      });
+
+      // Find the category label
+      const categoryObj = currentCategories.find(cat => cat.id === selectedCategory);
+      const categoryLabel = categoryObj?.label || selectedCategory;
+
       const transactionData = {
         amount: parseFloat(amount),
-        title: CATEGORIES_CONFIG[selectedCategory]?.label || selectedCategory, // Simplification for title
+        title: initialTransaction?.title || categoryLabel,
         type: type,
         category: selectedCategory,
         date: date.toISOString(),
       } as any;
-      // Note: "lent" and "borrowed" might not exist on the backend type yet, casting to any or adjust context type.
-      // Assuming context handles 'expense' | 'income' primarily. If 'lent'/'borrowed' are valid, remove 'as any'.
 
       if (initialTransaction) {
+        console.log('Updating transaction:', initialTransaction.id);
         await updateTransaction(initialTransaction.id, transactionData);
+        console.log('Update successful');
       } else {
+        console.log('Adding new transaction');
         await addTransaction(transactionData);
+        console.log('Add successful');
       }
+
       onClose?.();
-    } catch (error) {
-      console.error(error);
-      alert('Failed to save transaction');
+    } catch (error: any) {
+      console.error('Save failed:', error);
+      const errorMessage = error?.message || 'Failed to save transaction';
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -114,9 +219,9 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
       >
         <Pressable
           onPress={onClose}
-          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/5 items-center justify-center active:bg-gray-200 dark:active:bg-white/10"
+          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/5 items-center justify-center"
         >
-          <ArrowLeft size={24} color={Platform.OS === 'ios' ? '#000' : 'gray'} className="dark:text-white text-black" />
+          <ArrowLeft size={24} color="#9CA3AF" />
         </Pressable>
         <Text className="text-xl font-bold ml-4 font-display text-gray-900 dark:text-white">
           {initialTransaction ? 'Edit Transaction' : 'New Transaction'}
@@ -129,7 +234,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         <View className="items-center justify-center py-8">
           <View className="flex-row items-center justify-center relative">
             <Text className="text-gray-800 dark:text-white text-[3.5rem] leading-none font-bold tracking-tight font-display">
-              ${amount || '0'}
+              ₹{amount || '0'}
             </Text>
             <View className="h-10 w-1 bg-primary ml-1 rounded-full" />
           </View>
@@ -138,17 +243,26 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         {/* Transaction Type Switcher */}
         <View className="mb-8">
           <View className="flex-row p-1.5 bg-gray-100 dark:bg-[#0d1811] rounded-full border border-gray-200 dark:border-white/5 shadow-inner">
-            {['expense', 'income', 'lent', 'borrowed'].map((t) => (
-              <Pressable
-                key={t}
-                onPress={() => setType(t as any)}
-                className={`flex-1 py-2.5 rounded-full items-center justify-center ${type === t ? 'bg-white dark:bg-primary shadow-sm' : ''}`}
-              >
-                <Text className={`text-sm font-semibold capitalize ${type === t ? 'text-black dark:text-background-dark' : 'text-gray-500 dark:text-gray-400'}`}>
-                  {t}
-                </Text>
-              </Pressable>
-            ))}
+            <TypeButton
+              label="Expense"
+              isSelected={type === 'expense'}
+              onPress={() => handleTypeChange('expense')}
+            />
+            <TypeButton
+              label="Income"
+              isSelected={type === 'income'}
+              onPress={() => handleTypeChange('income')}
+            />
+            <TypeButton
+              label="Lent"
+              isSelected={type === 'lent'}
+              onPress={() => handleTypeChange('lent')}
+            />
+            <TypeButton
+              label="Borrowed"
+              isSelected={type === 'borrowed'}
+              onPress={() => handleTypeChange('borrowed')}
+            />
           </View>
         </View>
 
@@ -156,10 +270,12 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         <View className="mb-6">
           <View className="flex-row justify-between items-end px-1 mb-4">
             <Text className="text-xs font-bold tracking-widest text-gray-400 dark:text-primary/60 uppercase font-display">Category</Text>
-            <Text className="text-xs text-primary font-medium">View All</Text>
+            <Pressable onPress={() => setShowAllCategories(true)}>
+              <Text className="text-xs text-primary font-medium">View All ({currentCategories.length})</Text>
+            </Pressable>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row -mx-6 px-6 pb-2">
-            {EXPENSE_CATEGORIES.map((cat) => {
+            {currentCategories.slice(0, 6).map((cat) => {
               const Icon = cat.icon;
               const isSelected = selectedCategory === cat.id;
               return (
@@ -186,10 +302,10 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
               <Pressable
                 key={key}
                 onPress={() => handleKeyPress(key.toString())}
-                className="w-[30%] h-16 rounded-full items-center justify-center active:bg-gray-100 dark:active:bg-white/10"
+                className="w-[30%] h-16 rounded-full items-center justify-center"
               >
                 {isIcon ? (
-                  <Delete size={28} color={Platform.OS === 'ios' ? 'white' : 'gray'} className="dark:text-white text-gray-900" />
+                  <Delete size={28} color="#9CA3AF" />
                 ) : (
                   <Text className="text-3xl font-normal text-gray-900 dark:text-white font-display">
                     {key}
@@ -205,7 +321,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
           <Pressable
             onPress={handleSave}
             disabled={loading || !amount}
-            className="w-full h-16 bg-primary rounded-full flex-row items-center justify-center gap-3 shadow-lg active:scale-[0.98]"
+            className="w-full h-16 bg-primary rounded-full flex-row items-center justify-center gap-3 shadow-lg"
             style={{
               shadowColor: '#36e27b',
               shadowOffset: { width: 0, height: 4 },
@@ -225,6 +341,97 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         </View>
 
       </ScrollView>
+
+      {/* View All Categories Modal */}
+      <Modal
+        visible={showAllCategories}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAllCategories(false)}
+      >
+        <View className="flex-1 bg-black/70 justify-end">
+          <Pressable className="flex-1" onPress={() => setShowAllCategories(false)} />
+          <View className="bg-white dark:bg-[#122118] rounded-t-[32px] max-h-[80%]">
+            <BlurView intensity={Platform.OS === 'ios' ? 20 : 100} tint="dark" className="absolute inset-0 rounded-t-[32px]" />
+            <LinearGradient
+              colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              className="absolute inset-0 rounded-t-[32px]"
+            />
+
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between p-6 border-b border-white/10">
+              <Text className="text-xl font-bold text-white font-display">Select Category</Text>
+              <Pressable
+                onPress={() => setShowAllCategories(false)}
+                className="w-10 h-10 rounded-full bg-white/5 items-center justify-center"
+              >
+                <X size={20} color="#9CA3AF" />
+              </Pressable>
+            </View>
+
+            {/* All Categories Grid */}
+            <ScrollView className="px-6 py-4" showsVerticalScrollIndicator={false}>
+              <View className="flex-row flex-wrap gap-3 pb-6">
+                {currentCategories.map((cat) => {
+                  const Icon = cat.icon;
+                  const isSelected = selectedCategory === cat.id;
+                  return (
+                    <Pressable
+                      key={cat.id}
+                      onPress={() => {
+                        setSelectedCategory(cat.id);
+                        setShowAllCategories(false);
+                      }}
+                      className="w-[48%]"
+                    >
+                      <View className={`p-4 rounded-2xl border ${isSelected ? 'bg-primary border-primary' : 'bg-white/5 border-white/10'}`}>
+                        <Icon size={24} color={isSelected ? '#112117' : '#36e27b'} />
+                        <Text className={`text-sm font-medium mt-2 ${isSelected ? 'text-[#112117]' : 'text-white'}`}>
+                          {cat.label}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  typeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeButtonSelected: {
+    backgroundColor: '#36e27b',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  typeButtonUnselected: {
+    backgroundColor: 'transparent',
+  },
+  typeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  typeButtonTextSelected: {
+    color: '#112117',
+  },
+  typeButtonTextUnselected: {
+    color: '#9CA3AF',
+  },
+});

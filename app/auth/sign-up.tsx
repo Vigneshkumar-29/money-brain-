@@ -17,6 +17,12 @@ export default function SignUpScreen() {
 
     const handleSignUp = async () => {
         if (loading) return;
+
+        if (!fullName.trim()) {
+            Alert.alert('Error', 'Please enter your full name');
+            return;
+        }
+
         if (password !== confirmPassword) {
             Alert.alert('Error', 'Passwords do not match');
             return;
@@ -24,8 +30,8 @@ export default function SignUpScreen() {
 
         setLoading(true);
         try {
-            await signUp(email, password);
-            Alert.alert('Success', 'Please check your email for verification!');
+            await signUp(email, password, fullName.trim());
+            Alert.alert('Success', 'Account created! Please check your email for verification.');
         } catch (error: any) {
             Alert.alert('Error', error.message);
         } finally {

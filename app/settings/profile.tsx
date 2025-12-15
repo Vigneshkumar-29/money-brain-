@@ -4,18 +4,14 @@ import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, Camera, User, Mail, Save } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, Save } from 'lucide-react-native';
 import FadeInView from '../../components/ui/FadeInView';
-import { BlurView } from 'expo-blur';
 
 export default function ProfileSettings() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, refreshProfile } = useAuth();
     const [loading, setLoading] = useState(false);
     const [username, setUsername] = useState('');
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -30,7 +26,7 @@ export default function ProfileSettings() {
 
             const { data, error, status } = await supabase
                 .from('profiles')
-                .select(`username, avatar_url`)
+                .select(`username`)
                 .eq('id', user.id)
                 .single();
 
@@ -40,7 +36,6 @@ export default function ProfileSettings() {
 
             if (data) {
                 setUsername(data.username);
-                setAvatarUrl(data.avatar_url);
             }
         } catch (error) {
             if (error instanceof Error) {
@@ -60,8 +55,7 @@ export default function ProfileSettings() {
             const updates = {
                 id: user.id,
                 username,
-                avatar_url: avatarUrl,
-                updated_at: new Date(),
+                updated_at: new Date().toISOString(),
             };
 
             const { error } = await supabase.from('profiles').upsert(updates);
@@ -69,6 +63,10 @@ export default function ProfileSettings() {
             if (error) {
                 throw error;
             }
+
+            // Refresh profile in AuthContext
+            await refreshProfile();
+
             Alert.alert('Success', 'Profile updated successfully!');
             router.back();
         } catch (error) {
@@ -78,68 +76,6 @@ export default function ProfileSettings() {
         } finally {
             setLoading(false);
         }
-    }
-
-    async function pickImage() {
-        try {
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.5,
-                base64: true,
-            });
-
-            if (!result.canceled && result.assets[0].base64) {
-                uploadAvatar(result.assets[0].base64);
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Error picking image');
-        }
-    }
-
-    async function uploadAvatar(base64: string) {
-        try {
-            setLoading(true);
-            if (!user) return;
-
-            const fileName = `${user.id}/${Date.now()}.jpg`;
-            const filePath = `${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('avatars')
-                .upload(filePath, decode(base64), {
-                    contentType: 'image/jpeg',
-                    upsert: true,
-                });
-
-            if (uploadError) {
-                // Fallback if standard upload fails - typically we need ArrayBuffer from base64
-                // For now, let's just assume we store the base64 string directly in DB if storage isn't set up, 
-                // OR better - assume user just wants to see it locally before we have full storage logic.
-                // Given the complexity of Supabase Storage RLS + blobs in RN without polyfills sometimes:
-                // We will just set the local preview for now.
-                throw uploadError;
-            }
-
-            const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-            setAvatarUrl(data.publicUrl);
-
-        } catch (error) {
-            // Alert.alert('Upload Error', 'Failed to upload image. Storage might not be configured.');
-            // For demo purposes, we can't easily upload without a polyfill for fetch/blob usually. 
-            // Let's mock it by not actually uploading but pretending.
-            // In a real app, you'd need `base64-arraybuffer`.
-            console.log('Upload skipped (missing polyfill), seeing local only?');
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    // Helper to handle base64 for now since we didn't install base64-arraybuffer
-    const decode = (base64: string) => {
-        // This is a placeholder. Real implementation needs base64-arraybuffer or fetch polyfill
-        return Buffer.from(base64, 'base64');
     }
 
     return (
@@ -152,24 +88,13 @@ export default function ProfileSettings() {
                     onPress={() => router.back()}
                     className="w-10 h-10 items-center justify-center rounded-full bg-white/5 active:bg-white/10"
                 >
-                    <ArrowLeft size={24} color="#374151" className="dark:text-white" />
+                    <ArrowLeft size={24} color="#9CA3AF" />
                 </Pressable>
                 <Text className="text-xl font-display font-bold text-text-primary dark:text-text-dark">Edit Profile</Text>
                 <View className="w-10" />
             </View>
 
             <FadeInView className="flex-1 px-6 pt-8">
-                <View className="items-center mb-8 relative">
-                    <Pressable onPress={pickImage} className="relative">
-                        <Image
-                            source={avatarUrl ? { uri: avatarUrl } : { uri: "https://ui-avatars.com/api/?background=36e27b&color=fff&name=" + (username || 'User') }}
-                            className="w-28 h-28 rounded-full border-4 border-white dark:border-gray-800"
-                        />
-                        <View className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-white dark:border-gray-800">
-                            <Camera size={16} color="white" />
-                        </View>
-                    </Pressable>
-                </View>
 
                 <View className="space-y-4">
                     <View>
@@ -205,13 +130,13 @@ export default function ProfileSettings() {
                 <Pressable
                     onPress={updateProfile}
                     disabled={loading}
-                    className={`h-14 rounded-2xl flex-row items-center justify-center ${loading ? 'bg-primary/70' : 'bg-primary'} active:opacity-90 shadow-lg shadow-primary/30`}
+                    className={`h-14 rounded-2xl flex-row items-center justify-center gap-2 ${loading ? 'bg-primary/70' : 'bg-primary'} active:opacity-90 shadow-lg shadow-primary/30`}
                 >
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
                         <>
-                            <Save size={20} color="white" className="mr-2" />
+                            <Save size={20} color="white" />
                             <Text className="text-white font-bold text-lg font-display">Save Changes</Text>
                         </>
                     )}

@@ -1,4 +1,4 @@
-import { View, Text, TextInput, Pressable, ScrollView, Platform, SectionList } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, Platform, SectionList, Alert } from 'react-native';
 import React, { useState, useMemo } from 'react';
 import { useTransactions, Transaction } from '../../context/TransactionContext';
 import { BlurView } from 'expo-blur';
@@ -18,9 +18,12 @@ import {
   Home,
   Zap,
   Coffee,
-  Tag
+  Tag,
+  Car
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { rfs, rs, getIconSize, getContainerPadding, spacing, typography } from '../../lib/responsive';
+import TransactionActionModal from '../../components/transactions/TransactionActionModal';
 
 const GlassPanel = ({ children, className = "", style = {}, onPress }: { children: React.ReactNode, className?: string, style?: any, onPress?: () => void }) => {
   const Container = onPress ? Pressable : View;
@@ -38,8 +41,8 @@ const GlassPanel = ({ children, className = "", style = {}, onPress }: { childre
   );
 };
 
-const GlassInput = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
-  <View className={`overflow-hidden rounded-full border border-white/5 ${className}`}>
+const GlassInput = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: any }) => (
+  <View className={`overflow-hidden rounded-full border border-white/5 ${className}`} style={style}>
     <BlurView intensity={Platform.OS === 'ios' ? 10 : 80} tint="dark" className="absolute inset-0" />
     <LinearGradient
       colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.02)']}
@@ -55,7 +58,11 @@ export default function TransactionsScreen() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
-  const { transactions, totals } = useTransactions();
+  const { transactions, totals, deleteTransaction } = useTransactions();
+
+  // Modal state
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const getCategoryIcon = (category: string) => {
     const cat = category.toLowerCase();
@@ -152,35 +159,158 @@ export default function TransactionsScreen() {
     return grouped;
   }, [filteredTransactions]);
 
+  // Handler functions
+  const handleTransactionPress = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setModalVisible(true);
+  };
+
+  const handleEdit = () => {
+    setModalVisible(false);
+    if (selectedTransaction) {
+      router.push({ pathname: '/transaction-modal', params: { id: selectedTransaction.id } });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedTransaction) return;
+
+    setModalVisible(false);
+
+    Alert.alert(
+      'Delete Transaction',
+      `Are you sure you want to delete "${selectedTransaction.title}"? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('Starting delete for transaction:', selectedTransaction.id);
+              await deleteTransaction(selectedTransaction.id);
+              console.log('Delete completed successfully');
+
+              // Clear selection after successful delete
+              setSelectedTransaction(null);
+
+              Alert.alert(
+                'Success',
+                'Transaction deleted successfully',
+                [{ text: 'OK' }]
+              );
+            } catch (error: any) {
+              console.error('Delete failed:', error);
+
+              // Provide detailed error message
+              const errorMessage = error?.message || 'Failed to delete transaction. Please try again.';
+              Alert.alert(
+                'Error',
+                errorMessage,
+                [{ text: 'OK' }]
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedTransaction(null);
+  };
+
+  const containerPadding = getContainerPadding();
+  const iconSize = getIconSize(24);
+  const smallIconSize = getIconSize(20);
+
   return (
     <View className="flex-1 bg-background-light dark:bg-background-dark">
       {/* Top Navigation Bar */}
-      <View className="pt-14 pb-4 px-6 flex-row items-center justify-between z-10 sticky top-0 bg-background-dark/95">
+      <View style={{ paddingTop: rs(56), paddingBottom: rs(16), paddingHorizontal: containerPadding }} className="flex-row items-center justify-between z-10 sticky top-0 bg-background-dark/95">
         <Pressable
           onPress={() => router.back()}
-          className="w-10 h-10 items-center justify-center rounded-full active:bg-white/10"
+          style={{ width: rs(40), height: rs(40) }}
+          className="items-center justify-center rounded-full active:bg-white/10"
         >
-          <ArrowLeft size={24} color="white" />
+          <ArrowLeft size={iconSize} color="white" />
         </Pressable>
-        <Text className="text-lg font-bold uppercase tracking-widest text-white/90 font-display">Transactions</Text>
+        <Text style={{ fontSize: typography.lg }} className="font-bold uppercase tracking-widest text-white/90 font-display">Wallet</Text>
         <Pressable
           onPress={() => router.push('/transaction-modal')}
-          className="w-10 h-10 items-center justify-center rounded-full bg-white/5 border border-white/10 active:bg-primary"
+          style={{ width: rs(40), height: rs(40) }}
+          className="items-center justify-center rounded-full bg-white/5 border border-white/10 active:bg-primary"
         >
-          <Plus size={24} color="white" />
+          <Plus size={iconSize} color="white" />
         </Pressable>
       </View>
 
+      {/* Wallet Balance Overview */}
+      <View style={{ paddingHorizontal: containerPadding, marginTop: spacing.md }}>
+        <GlassPanel style={{ padding: spacing['2xl'], position: 'relative', overflow: 'hidden' }}>
+          {/* Decorative Glow */}
+          <View className="absolute -right-10 -top-10 w-32 h-32 bg-primary/10 rounded-full blur-2xl" />
+
+          <View className="relative z-10">
+            {/* Total Balance */}
+            <View style={{ marginBottom: spacing.xl }}>
+              <Text style={{ fontSize: typography.sm }} className="text-gray-400 font-medium mb-2 font-display">Total Balance</Text>
+              <Text style={{ fontSize: rfs(36) }} className="text-white font-bold tracking-tight font-display">
+                {formatCurrency(totals.balance)}
+              </Text>
+            </View>
+
+            {/* Income & Expense Stats */}
+            <View className="flex-row gap-4">
+              {/* Income */}
+              <View className="flex-1">
+                <View className="flex-row items-center gap-2 mb-2">
+                  <View style={{ width: rs(8), height: rs(8) }} className="rounded-full bg-emerald-500" />
+                  <Text style={{ fontSize: typography.xs }} className="text-gray-400 uppercase tracking-wider font-bold font-display">Income</Text>
+                </View>
+                <Text style={{ fontSize: typography.lg }} className="text-emerald-400 font-bold font-mono">
+                  +{formatCurrency(totals.income)}
+                </Text>
+              </View>
+
+              {/* Expense */}
+              <View className="flex-1">
+                <View className="flex-row items-center gap-2 mb-2">
+                  <View style={{ width: rs(8), height: rs(8) }} className="rounded-full bg-rose-500" />
+                  <Text style={{ fontSize: typography.xs }} className="text-gray-400 uppercase tracking-wider font-bold font-display">Expense</Text>
+                </View>
+                <Text style={{ fontSize: typography.lg }} className="text-rose-400 font-bold font-mono">
+                  -{formatCurrency(totals.expense)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </GlassPanel>
+      </View>
+
       {/* Main Content Area */}
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: rs(100) }} showsVerticalScrollIndicator={false}>
+        {/* Transaction History Header */}
+        <View style={{ paddingHorizontal: containerPadding, marginTop: spacing['2xl'], marginBottom: spacing.md }}>
+          <Text style={{ fontSize: typography.xl }} className="font-bold text-white font-display">Transaction History</Text>
+          <Text style={{ fontSize: typography.sm, marginTop: spacing.xs }} className="text-gray-400 font-display">
+            {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transaction' : 'transactions'} found
+          </Text>
+        </View>
+
         {/* Search Bar */}
-        <View className="px-6 mt-4">
-          <GlassInput className="flex-row w-full items-center h-12">
-            <View className="pl-4 pr-2">
-              <Search size={20} color="#95c6a9" />
+        <View style={{ paddingHorizontal: containerPadding, marginTop: spacing.lg }}>
+          <GlassInput style={{ height: rs(48) }} className="flex-row w-full items-center">
+            <View style={{ paddingLeft: spacing.lg, paddingRight: spacing.sm }}>
+              <Search size={smallIconSize} color="#95c6a9" />
             </View>
             <TextInput
-              className="flex-1 text-white h-full text-base font-body"
+              className="flex-1 text-white h-full font-body"
+              style={{ fontSize: typography.base }}
               placeholder="Search transactions..."
               placeholderTextColor="rgba(255,255,255,0.3)"
               value={search}
@@ -190,67 +320,71 @@ export default function TransactionsScreen() {
         </View>
 
         {/* Filter Chips */}
-        <View className="mt-6 pl-6">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 24, gap: 12 }}>
+        <View style={{ marginTop: spacing['2xl'], paddingLeft: containerPadding }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: containerPadding, gap: spacing.md }}>
             <Pressable
               onPress={() => setFilterType('All')}
-              className={`h-9 px-5 rounded-full items-center justify-center border ${filterType === 'All' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
+              style={{ height: rs(36), paddingHorizontal: spacing.lg }}
+              className={`rounded-full items-center justify-center border ${filterType === 'All' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
             >
-              <Text className={`${filterType === 'All' ? 'text-primary' : 'text-white/70'} text-sm font-bold`}>All</Text>
+              <Text style={{ fontSize: typography.sm }} className={`${filterType === 'All' ? 'text-primary' : 'text-white/70'} font-bold`}>All</Text>
             </Pressable>
             <Pressable
               onPress={() => setFilterType('Expense')}
-              className={`h-9 px-5 rounded-full items-center justify-center border ${filterType === 'Expense' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
+              style={{ height: rs(36), paddingHorizontal: spacing.lg }}
+              className={`rounded-full items-center justify-center border ${filterType === 'Expense' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
             >
-              <Text className={`${filterType === 'Expense' ? 'text-primary' : 'text-white/70'} text-sm font-bold`}>Expense</Text>
+              <Text style={{ fontSize: typography.sm }} className={`${filterType === 'Expense' ? 'text-primary' : 'text-white/70'} font-bold`}>Expense</Text>
             </Pressable>
             <Pressable
               onPress={() => setFilterType('Income')}
-              className={`h-9 px-5 rounded-full items-center justify-center border ${filterType === 'Income' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
+              style={{ height: rs(36), paddingHorizontal: spacing.lg }}
+              className={`rounded-full items-center justify-center border ${filterType === 'Income' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
             >
-              <Text className={`${filterType === 'Income' ? 'text-primary' : 'text-white/70'} text-sm font-bold`}>Income</Text>
+              <Text style={{ fontSize: typography.sm }} className={`${filterType === 'Income' ? 'text-primary' : 'text-white/70'} font-bold`}>Income</Text>
             </Pressable>
 
-            <GlassPanel className="h-9 px-5 flex-row items-center justify-center gap-2 rounded-full">
-              <Tag size={16} color={filterType === 'Category' ? '#36e27b' : '#36e27b'} />
-              <Text className="text-white/70 text-sm font-medium">Category</Text>
+            <GlassPanel style={{ height: rs(36), paddingHorizontal: spacing.lg }} className="flex-row items-center justify-center gap-2 rounded-full">
+              <Tag size={getIconSize(16)} color={filterType === 'Category' ? '#36e27b' : '#36e27b'} />
+              <Text style={{ fontSize: typography.sm }} className="text-white/70 font-medium">Category</Text>
             </GlassPanel>
 
-            <GlassPanel className="h-9 px-5 flex-row items-center justify-center gap-2 rounded-full">
-              <Calendar size={16} color="#36e27b" />
-              <Text className="text-white/70 text-sm font-medium">Date</Text>
+            <GlassPanel style={{ height: rs(36), paddingHorizontal: spacing.lg }} className="flex-row items-center justify-center gap-2 rounded-full">
+              <Calendar size={getIconSize(16)} color="#36e27b" />
+              <Text style={{ fontSize: typography.sm }} className="text-white/70 font-medium">Date</Text>
             </GlassPanel>
           </ScrollView>
         </View>
 
         {/* Transactions List */}
-        <View className="mt-6 px-6 gap-6">
+        <View style={{ marginTop: spacing['2xl'], paddingHorizontal: containerPadding, gap: spacing['2xl'] }}>
           {groupedTransactions.map((group, groupIndex) => (
-            <View key={group.title || groupIndex} className="gap-3">
-              <Text className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em] ml-2 font-display">{group.title}</Text>
+            <View key={group.title || groupIndex} style={{ gap: spacing.md }}>
+              <Text style={{ fontSize: typography.xs, marginLeft: spacing.sm }} className="font-bold text-gray-500 uppercase tracking-[0.2em] font-display">{group.title}</Text>
               {group.data.map((item) => {
                 const Icon = getCategoryIcon(item.category);
-                const isIncome = item.type === 'income' || item.type === 'lent'; // Treating lent as positive cash flow visual for now if desired, or handle differently
+                const isIncome = item.type === 'income' || item.type === 'lent';
 
                 return (
                   <GlassPanel
                     key={item.id}
-                    className="p-4 flex-row items-center justify-between gap-4 active:scale-[0.98]"
-                    onPress={() => router.push({ pathname: '/transaction-modal', params: { id: item.id } })}
+                    style={{ padding: spacing.lg, gap: spacing.lg }}
+                    className="flex-row items-center justify-between active:scale-[0.98]"
+                    onPress={() => handleTransactionPress(item)}
                   >
-                    <View className="flex-row items-center gap-4 flex-1 overflow-hidden">
-                      <View className={`items-center justify-center rounded-full shrink-0 w-12 h-12 border ${item.type === 'income' ? 'bg-primary/10 border-primary/30' : 'bg-white/5 border-white/10'}`}>
-                        <Icon size={24} color={item.type === 'income' ? '#36e27b' : 'rgba(255,255,255,0.8)'} />
+                    <View style={{ gap: spacing.lg }} className="flex-row items-center flex-1 overflow-hidden">
+                      <View style={{ width: rs(48), height: rs(48) }} className={`items-center justify-center rounded-full shrink-0 border ${item.type === 'income' ? 'bg-primary/10 border-primary/30' : 'bg-white/5 border-white/10'}`}>
+                        <Icon size={iconSize} color={item.type === 'income' ? '#36e27b' : 'rgba(255,255,255,0.8)'} />
                       </View>
                       <View className="flex-1 justify-center">
-                        <Text className="text-white text-base font-bold leading-tight truncate font-display" numberOfLines={1}>{item.title}</Text>
-                        <Text className={`${item.type === 'income' ? 'text-[#95c6a9]' : 'text-white/50'} text-xs font-normal mt-1 truncate font-body`} numberOfLines={1}>
+                        <Text style={{ fontSize: typography.base }} className="text-white font-bold leading-tight truncate font-display" numberOfLines={1}>{item.title}</Text>
+                        <Text style={{ fontSize: typography.xs, marginTop: spacing.xs }} className={`${item.type === 'income' ? 'text-[#95c6a9]' : 'text-white/50'} font-normal truncate font-body`} numberOfLines={1}>
                           {item.category} • {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
                       </View>
                     </View>
                     <View className="shrink-0 text-right">
-                      <Text className={`${item.type === 'income' ? 'text-primary' : 'text-red-500'} text-base font-bold leading-normal font-display`}>
+                      <Text style={{ fontSize: typography.base }} className={`${item.type === 'income' ? 'text-primary' : 'text-red-500'} font-bold leading-normal font-display`}>
                         {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount)}
                       </Text>
                     </View>
@@ -261,43 +395,33 @@ export default function TransactionsScreen() {
           ))}
 
           {transactions.length === 0 && (
-            <View className="items-center justify-center py-10 opacity-50">
-              <Text className="text-white font-display">No transactions found</Text>
+            <View style={{ paddingVertical: spacing['4xl'] }} className="items-center justify-center opacity-50">
+              <Text style={{ fontSize: typography.base }} className="text-white font-display">No transactions found</Text>
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* Floating Dashboard Stats (Footer) */}
-      <View className="absolute bottom-[92px] left-0 w-full px-4 z-20">
-        <GlassPanel className="p-5 flex-row justify-between items-center bg-[#112117]/80 rounded-3xl">
-          {/* Income */}
-          <View className="flex-col gap-1 w-1/3 border-r border-white/10">
-            <View className="flex-row items-center gap-1">
-              <View className="w-1.5 h-1.5 rounded-full bg-primary" style={{ shadowColor: '#36e27b', shadowOpacity: 0.5, shadowRadius: 5 }} />
-              <Text className="text-[10px] text-gray-400 uppercase tracking-wider font-bold font-display">Income</Text>
-            </View>
-            <Text className="text-white font-bold text-sm tracking-tight font-mono">+{formatCurrency(totals.income)}</Text>
-          </View>
-
-          {/* Expense */}
-          <View className="flex-col gap-1 w-1/3 border-r border-white/10 pl-4">
-            <View className="flex-row items-center gap-1">
-              <View className="w-1.5 h-1.5 rounded-full bg-red-500" style={{ shadowColor: '#ef4444', shadowOpacity: 0.5, shadowRadius: 5 }} />
-              <Text className="text-[10px] text-gray-400 uppercase tracking-wider font-bold font-display">Expense</Text>
-            </View>
-            <Text className="text-white font-medium text-sm tracking-tight font-mono">-{formatCurrency(totals.expense)}</Text>
-          </View>
-
-          {/* Balance */}
-          <View className="flex-col gap-1 w-1/3 items-end">
-            <Text className="text-[10px] text-gray-400 uppercase tracking-wider font-bold font-display">Balance</Text>
-            <Text className="text-primary font-bold text-lg tracking-tight font-mono" style={{ shadowColor: '#36e27b', shadowOpacity: 0.3, shadowRadius: 8 }}>
-              {formatCurrency(totals.balance)}
-            </Text>
-          </View>
-        </GlassPanel>
-      </View>
+      {/* Transaction Action Modal */}
+      {selectedTransaction && (
+        <TransactionActionModal
+          visible={modalVisible}
+          onClose={handleCloseModal}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          title={selectedTransaction.title}
+          amount={formatCurrency(selectedTransaction.amount)}
+          category={selectedTransaction.category}
+          date={new Date(selectedTransaction.date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
+          isExpense={selectedTransaction.type === 'expense'}
+        />
+      )}
     </View>
   );
 }

@@ -123,15 +123,26 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     };
 
     const deleteTransaction = async (id: string) => {
-        if (!user) return;
+        if (!user) {
+            console.error('No user found for delete operation');
+            throw new Error('User not authenticated');
+        }
+
         try {
+            console.log('Deleting transaction:', id, 'for user:', user.id);
+
             const { error } = await supabase
                 .from('transactions')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('user_id', user.id);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase delete error:', error);
+                throw error;
+            }
 
+            console.log('Transaction deleted successfully');
             await fetchTransactions();
         } catch (error) {
             console.error('Error deleting transaction:', error);
@@ -140,18 +151,40 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     };
 
     const updateTransaction = async (id: string, updates: Partial<Omit<Transaction, 'id' | 'created_at'>>) => {
-        if (!user) return;
+        if (!user) {
+            console.error('No user found for update operation');
+            throw new Error('User not authenticated');
+        }
+
         try {
+            console.log('Updating transaction:', id, 'for user:', user.id, 'with updates:', updates);
+
+            // Only send fields that should be updated, exclude system fields
+            const updateData: any = {};
+            if (updates.amount !== undefined) updateData.amount = updates.amount;
+            if (updates.title !== undefined) updateData.title = updates.title;
+            if (updates.type !== undefined) updateData.type = updates.type;
+            if (updates.category !== undefined) updateData.category = updates.category;
+            if (updates.date !== undefined) updateData.date = updates.date;
+
+            // Explicitly set updated_at to current timestamp
+            // This works whether or not the trigger exists
+            updateData.updated_at = new Date().toISOString();
+
+            console.log('Sanitized update data:', updateData);
+
             const { error } = await supabase
                 .from('transactions')
-                .update({
-                    ...updates,
-                    amount: updates.amount, // Ensure consistent naming if needed
-                })
-                .eq('id', id);
+                .update(updateData)
+                .eq('id', id)
+                .eq('user_id', user.id);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase update error:', error);
+                throw error;
+            }
 
+            console.log('Transaction updated successfully');
             await fetchTransactions();
         } catch (error) {
             console.error('Error updating transaction:', error);

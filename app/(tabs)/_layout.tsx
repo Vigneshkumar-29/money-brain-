@@ -1,12 +1,20 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, View, Dimensions } from 'react-native';
 import { Home, BarChart2, Wallet, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { rfs, rs, getIconSize, MIN_TOUCH_TARGET } from '../../lib/responsive';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+
+  // Calculate responsive tab bar height
+  const tabBarHeight = Math.max(MIN_TOUCH_TARGET + rs(20), 70);
+  const iconSize = getIconSize(24);
+  const labelFontSize = rfs(10);
 
   return (
     <Tabs
@@ -17,9 +25,10 @@ export default function TabLayout() {
           backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(5, 10, 7, 0.9)',
           borderTopWidth: 1,
           borderTopColor: 'rgba(255, 255, 255, 0.05)',
-          height: 80, // Taller tab bar
-          paddingBottom: insets.bottom + 5,
-          paddingTop: 10,
+          height: tabBarHeight + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, rs(5)),
+          paddingTop: rs(10),
+          paddingHorizontal: rs(8),
           elevation: 0,
         },
         tabBarBackground: () => (
@@ -31,38 +40,41 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#6B7280',
         tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontFamily: 'Syne', // Using available font
-          fontSize: 10,
-          marginBottom: 5,
+          fontFamily: 'Syne',
+          fontSize: labelFontSize,
+          marginBottom: rs(5),
           fontWeight: '500',
+        },
+        tabBarIconStyle: {
+          marginTop: rs(5),
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Home size={iconSize} color={color} />,
         }}
       />
       <Tabs.Screen
         name="charts"
         options={{
           title: 'Analytics',
-          tabBarIcon: ({ color }) => <BarChart2 size={24} color={color} />,
+          tabBarIcon: ({ color }) => <BarChart2 size={iconSize} color={color} />,
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
           title: 'Wallet', // Renaming per design implies Wallet
-          tabBarIcon: ({ color }) => <Wallet size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Wallet size={iconSize} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color }) => <Settings size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Settings size={iconSize} color={color} />,
         }}
       />
     </Tabs>

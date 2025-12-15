@@ -56,7 +56,7 @@ export default function SecuritySettings() {
                     onPress={() => router.back()}
                     className="w-10 h-10 items-center justify-center rounded-full bg-white/5 active:bg-white/10"
                 >
-                    <ArrowLeft size={24} color="#374151" className="dark:text-white" />
+                    <ArrowLeft size={24} color="#9CA3AF" />
                 </Pressable>
                 <Text className="text-xl font-display font-bold text-text-primary dark:text-text-dark">Security</Text>
                 <View className="w-10" />

@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, Modal, Pressable, TouchableOpacity } from 'react-native';
+import { View, Text, Modal, Pressable, Platform } from 'react-native';
 import { Edit2, Trash2, X } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface TransactionActionModalProps {
     visible: boolean;
@@ -14,6 +15,19 @@ interface TransactionActionModalProps {
     date: string;
     isExpense: boolean;
 }
+
+const GlassPanel = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: any }) => (
+    <View className={`overflow-hidden rounded-3xl border border-white/10 ${className}`} style={style}>
+        <BlurView intensity={Platform.OS === 'ios' ? 20 : 100} tint="dark" className="absolute inset-0" />
+        <LinearGradient
+            colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            className="absolute inset-0"
+        />
+        {children}
+    </View>
+);
 
 export default function TransactionActionModal({
     visible,
@@ -34,87 +48,102 @@ export default function TransactionActionModal({
             onRequestClose={onClose}
         >
             <Pressable
-                className="flex-1 bg-black/50 justify-end"
+                className="flex-1 bg-black/70 justify-end"
                 onPress={onClose}
             >
                 <Pressable onPress={(e) => e.stopPropagation()}>
-                    <View className="bg-card-light dark:bg-card-dark rounded-t-3xl px-6 pb-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+                    <GlassPanel className="rounded-t-[32px] px-6 pb-8 pt-6">
                         {/* Header */}
-                        <View className="flex-row justify-between items-center mb-6">
-                            <View className="flex-1">
-                                <Text className="text-xl font-display font-bold text-text-primary dark:text-text-dark mb-1" numberOfLines={1}>
+                        <View className="flex-row justify-between items-start mb-6">
+                            <View className="flex-1 pr-4">
+                                <Text className="text-2xl font-display font-bold text-white mb-2" numberOfLines={1}>
                                     {title}
                                 </Text>
-                                <View className="flex-row items-center">
-                                    <Text className={`text-2xl font-mono font-bold mr-3 ${isExpense ? 'text-accent' : 'text-primary'
-                                        }`}>
-                                        {isExpense ? '-' : '+'}{amount}
-                                    </Text>
-                                </View>
-                                <Text className="text-sm font-body text-text-secondary mt-1">
+                                <Text className={`text-3xl font-mono font-bold mb-2 ${isExpense ? 'text-red-500' : 'text-primary'}`}>
+                                    {isExpense ? '-' : '+'}{amount}
+                                </Text>
+                                <Text className="text-sm font-body text-gray-400">
                                     {category} • {date}
                                 </Text>
                             </View>
                             <Pressable
                                 onPress={onClose}
-                                className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center active:scale-90"
+                                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 items-center justify-center active:scale-90"
                             >
-                                <X size={20} color="#6B7280" strokeWidth={2.5} />
+                                <X size={20} color="#9CA3AF" strokeWidth={2.5} />
                             </Pressable>
                         </View>
 
                         {/* Action Buttons */}
-                        <View className="space-y-3">
+                        <View className="gap-3">
                             {/* Edit Button */}
-                            <TouchableOpacity
+                            <Pressable
                                 onPress={onEdit}
-                                className="flex-row items-center bg-primary/10 border border-primary/20 rounded-2xl p-4 active:scale-98"
-                                activeOpacity={0.8}
+                                className="flex-row items-center rounded-2xl p-4 active:scale-[0.98] overflow-hidden border border-primary/20"
                             >
-                                <View className="w-12 h-12 rounded-full bg-primary items-center justify-center mr-4">
-                                    <Edit2 size={22} color="white" strokeWidth={2.5} />
+                                <BlurView intensity={Platform.OS === 'ios' ? 10 : 80} tint="dark" className="absolute inset-0" />
+                                <LinearGradient
+                                    colors={['rgba(54, 226, 123, 0.1)', 'rgba(54, 226, 123, 0.05)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    className="absolute inset-0"
+                                />
+                                <View className="w-12 h-12 rounded-full bg-primary items-center justify-center mr-4 z-10">
+                                    <Edit2 size={22} color="black" strokeWidth={2.5} />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="text-base font-display font-bold text-text-primary dark:text-text-dark mb-0.5">
+                                <View className="flex-1 z-10">
+                                    <Text className="text-base font-display font-bold text-white mb-0.5">
                                         Edit Transaction
                                     </Text>
-                                    <Text className="text-xs font-body text-text-secondary">
+                                    <Text className="text-xs font-body text-gray-400">
                                         Modify amount, category, or details
                                     </Text>
                                 </View>
-                            </TouchableOpacity>
+                            </Pressable>
 
                             {/* Delete Button */}
-                            <TouchableOpacity
+                            <Pressable
                                 onPress={onDelete}
-                                className="flex-row items-center bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-2xl p-4 active:scale-98"
-                                activeOpacity={0.8}
+                                className="flex-row items-center rounded-2xl p-4 active:scale-[0.98] overflow-hidden border border-red-500/20"
                             >
-                                <View className="w-12 h-12 rounded-full bg-red-500 items-center justify-center mr-4">
+                                <BlurView intensity={Platform.OS === 'ios' ? 10 : 80} tint="dark" className="absolute inset-0" />
+                                <LinearGradient
+                                    colors={['rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.05)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    className="absolute inset-0"
+                                />
+                                <View className="w-12 h-12 rounded-full bg-red-500 items-center justify-center mr-4 z-10">
                                     <Trash2 size={22} color="white" strokeWidth={2.5} />
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="text-base font-display font-bold text-red-500 mb-0.5">
+                                <View className="flex-1 z-10">
+                                    <Text className="text-base font-display font-bold text-red-400 mb-0.5">
                                         Delete Transaction
                                     </Text>
-                                    <Text className="text-xs font-body text-text-secondary">
+                                    <Text className="text-xs font-body text-gray-400">
                                         Remove this transaction permanently
                                     </Text>
                                 </View>
-                            </TouchableOpacity>
+                            </Pressable>
 
                             {/* Cancel Button */}
-                            <TouchableOpacity
+                            <Pressable
                                 onPress={onClose}
-                                className="bg-gray-100 dark:bg-gray-800 rounded-2xl p-4 active:scale-98 mt-2"
-                                activeOpacity={0.8}
+                                className="rounded-2xl p-4 active:scale-[0.98] mt-2 overflow-hidden border border-white/10"
                             >
-                                <Text className="text-base font-display font-bold text-text-primary dark:text-text-dark text-center">
+                                <BlurView intensity={Platform.OS === 'ios' ? 10 : 80} tint="dark" className="absolute inset-0" />
+                                <LinearGradient
+                                    colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    className="absolute inset-0"
+                                />
+                                <Text className="text-base font-display font-bold text-white text-center z-10">
                                     Cancel
                                 </Text>
-                            </TouchableOpacity>
+                            </Pressable>
                         </View>
-                    </View>
+                    </GlassPanel>
                 </Pressable>
             </Pressable>
         </Modal>
