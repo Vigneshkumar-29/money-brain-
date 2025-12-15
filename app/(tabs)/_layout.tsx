@@ -1,13 +1,11 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
-import { Home, List, PieChart, Settings } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
+import { Platform, View } from 'react-native';
+import { Home, BarChart2, Wallet, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 
 export default function TabLayout() {
-  const { colorScheme } = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
 
   return (
@@ -15,40 +13,49 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: isDark ? '#1A1F26' : '#FAFAF8',
-          borderTopColor: isDark ? '#2C333A' : '#E5E7EB',
-          height: 60 + Math.max(insets.bottom, 10),
-          paddingBottom: Math.max(insets.bottom, 10),
+          position: 'absolute',
+          backgroundColor: Platform.OS === 'ios' ? 'transparent' : 'rgba(5, 10, 7, 0.9)',
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(255, 255, 255, 0.05)',
+          height: 80, // Taller tab bar
+          paddingBottom: insets.bottom + 5,
           paddingTop: 10,
+          elevation: 0,
         },
-        tabBarActiveTintColor: '#2ECC71',
-        tabBarInactiveTintColor: isDark ? '#6B7280' : '#9CA3AF',
+        tabBarBackground: () => (
+          Platform.OS === 'ios' ? (
+            <BlurView intensity={80} tint="dark" style={{ flex: 1, backgroundColor: 'rgba(5, 10, 7, 0.5)' }} />
+          ) : null
+        ),
+        tabBarActiveTintColor: '#36e27b',
+        tabBarInactiveTintColor: '#6B7280',
         tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontFamily: 'SpaceMono',
+          fontFamily: 'Syne', // Using available font
           fontSize: 10,
-          marginTop: 4,
+          marginBottom: 5,
+          fontWeight: '500',
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ color }) => <Home size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="transactions"
-        options={{
-          title: 'Transactions',
-          tabBarIcon: ({ color }) => <List size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="charts"
         options={{
-          title: 'Charts',
-          tabBarIcon: ({ color }) => <PieChart size={24} color={color} />,
+          title: 'Analytics',
+          tabBarIcon: ({ color }) => <BarChart2 size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="transactions"
+        options={{
+          title: 'Wallet', // Renaming per design implies Wallet
+          tabBarIcon: ({ color }) => <Wallet size={24} color={color} />,
         }}
       />
       <Tabs.Screen

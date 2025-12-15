@@ -6,7 +6,10 @@ import { Moon, Sun, ChevronRight, User, Bell, Shield, LogOut } from 'lucide-reac
 import FadeInView from '../../components/ui/FadeInView';
 import { useAuth } from '../../context/AuthContext';
 
+import { useRouter } from 'expo-router';
+
 export default function Settings() {
+  const router = useRouter();
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const { signOut } = useAuth();
   const isDark = colorScheme === 'dark';
@@ -55,9 +58,9 @@ export default function Settings() {
 
         <FadeInView delay={100} className="bg-card-light dark:bg-card-dark rounded-2xl p-5 shadow-md border border-gray-100 dark:border-gray-800">
           <Text className="text-xs font-display font-bold text-text-secondary mb-3 uppercase tracking-wider">General</Text>
-          <SettingItem icon={User} title="Profile" onPress={() => { }} />
-          <SettingItem icon={Bell} title="Notifications" onPress={() => { }} />
-          <SettingItem icon={Shield} title="Security" onPress={() => { }} />
+          <SettingItem icon={User} title="Profile" onPress={() => router.push('/settings/profile')} />
+          <SettingItem icon={Bell} title="Notifications" onPress={() => router.push('/settings/notifications')} />
+          <SettingItem icon={Shield} title="Security" onPress={() => router.push('/settings/security')} />
         </FadeInView>
 
         <FadeInView delay={150} className="mt-6 mb-10">

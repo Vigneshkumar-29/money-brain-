@@ -27,7 +27,7 @@ export type Transaction = {
     id: string;
     amount: number;
     title: string;
-    type: 'income' | 'expense';
+    type: 'income' | 'expense' | 'lent' | 'borrowed';
     category: string;
     date: string;
     icon?: any; // We'll resolve this when using the data
@@ -161,7 +161,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
     const totals = transactions.reduce(
         (acc, curr) => {
-            if (curr.type === 'income') {
+            if (curr.type === 'income' || curr.type === 'borrowed') {
                 acc.income += curr.amount;
                 acc.balance += curr.amount;
             } else {

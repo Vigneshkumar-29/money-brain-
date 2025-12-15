@@ -1,98 +1,58 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useMemo } from 'react';
-import BarChart from '../../components/charts/BarChart';
-import FadeInView from '../../components/ui/FadeInView';
 import { useTransactions } from '../../context/TransactionContext';
-import { TrendingUp, TrendingDown, PieChart as PieChartIcon, Calendar } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
+import {
+  Bell,
+  Wallet,
+  TrendingUp,
+  MoreHorizontal,
+  Zap,
+  Tag,
+  Car,
+  ShoppingBag,
+  Utensils,
+  AlertTriangle,
+  Trophy,
+  FileText,
+  TableProperties,
+  ArrowRight
+} from 'lucide-react-native';
 
-type Period = 'week' | 'month' | 'year';
+const GlassPanel = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: any }) => (
+  <View className={`overflow-hidden rounded-2xl border border-white/10 ${className}`} style={style}>
+    <BlurView intensity={Platform.OS === 'ios' ? 20 : 100} tint="dark" className="absolute inset-0" />
+    <LinearGradient
+      colors={['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.01)']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      className="absolute inset-0"
+    />
+    {children}
+  </View>
+);
 
-export default function Charts() {
-  const [selectedPeriod, setSelectedPeriod] = useState<Period>('month');
-  const { transactions } = useTransactions();
+const GlassPanelHighlight = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: any }) => (
+  <View className={`overflow-hidden rounded-2xl border border-primary/20 ${className}`} style={style}>
+    <BlurView intensity={Platform.OS === 'ios' ? 30 : 100} tint="dark" className="absolute inset-0" />
+    <LinearGradient
+      colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.01)']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      className="absolute inset-0"
+    />
+    {children}
+  </View>
+);
 
-  // Calculate data based on selected period
-  const chartData = useMemo(() => {
-    const now = new Date();
-    const filtered = transactions.filter(tx => {
-      const txDate = new Date(tx.date);
-      if (selectedPeriod === 'week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return txDate >= weekAgo;
-      } else if (selectedPeriod === 'month') {
-        return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
-      } else {
-        return txDate.getFullYear() === now.getFullYear();
-      }
-    });
+export default function AnalyticsScreen() {
+  const { transactions, totals } = useTransactions();
+  const [selectedMonth, setSelectedMonth] = useState('January');
 
-    // Group by day for week, by week for month, by month for year
-    const grouped: { [key: string]: { income: number; expense: number } } = {};
-
-    filtered.forEach(tx => {
-      const txDate = new Date(tx.date);
-      let key: string;
-
-      if (selectedPeriod === 'week') {
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        key = days[txDate.getDay()];
-      } else if (selectedPeriod === 'month') {
-        const weekNum = Math.ceil(txDate.getDate() / 7);
-        key = `Week ${weekNum}`;
-      } else {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        key = months[txDate.getMonth()];
-      }
-
-      if (!grouped[key]) {
-        grouped[key] = { income: 0, expense: 0 };
-      }
-
-      if (tx.type === 'income') {
-        grouped[key].income += tx.amount;
-      } else {
-        grouped[key].expense += tx.amount;
-      }
-    });
-
-    return grouped;
-  }, [transactions, selectedPeriod]);
-
-  // Category breakdown
-  const categoryData = useMemo(() => {
-    const expenses = transactions.filter(tx => tx.type === 'expense');
-    const categoryTotals: { [key: string]: number } = {};
-
-    expenses.forEach(tx => {
-      categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
-    });
-
-    return Object.entries(categoryTotals)
-      .map(([category, amount]) => ({
-        label: category.charAt(0).toUpperCase() + category.slice(1),
-        value: amount,
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [transactions]);
-
-  // Prepare expense chart data
-  const expenseChartData = Object.entries(chartData).map(([label, data]) => ({
-    label,
-    value: data.expense,
-  }));
-
-  // Prepare income chart data
-  const incomeChartData = Object.entries(chartData).map(([label, data]) => ({
-    label,
-    value: data.income,
-  }));
-
-  // Calculate totals
-  const totalExpense = expenseChartData.reduce((sum, item) => sum + item.value, 0);
-  const totalIncome = incomeChartData.reduce((sum, item) => sum + item.value, 0);
-  const netSavings = totalIncome - totalExpense;
+  const months = ['January', 'February', 'March', 'April', 'May'];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -103,183 +63,238 @@ export default function Charts() {
     }).format(amount);
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-background-light dark:bg-background-dark">
-      <ScrollView className="flex-1 px-5 pt-6" showsVerticalScrollIndicator={false}>
-        <FadeInView delay={0}>
-          <Text className="text-3xl font-display font-bold text-text-primary dark:text-text-dark mb-2">
-            Analytics
-          </Text>
-          <Text className="text-sm font-body text-text-secondary mb-6">
-            Track your spending patterns and insights
-          </Text>
-        </FadeInView>
+  // Calculate percentages for "Spending Mix"
+  const categoryData = useMemo(() => {
+    const expenses = transactions.filter(tx => tx.type === 'expense');
+    const totalExp = expenses.reduce((sum, tx) => sum + tx.amount, 0);
+    const categoryTotals: { [key: string]: number } = {};
 
-        {/* Period Selector */}
-        <FadeInView delay={50} className="mb-6">
-          <View className="flex-row bg-card-light dark:bg-card-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-1.5 shadow-sm">
-            {(['week', 'month', 'year'] as Period[]).map((period) => (
-              <Pressable
-                key={period}
-                onPress={() => setSelectedPeriod(period)}
-                className={`flex-1 py-3 rounded-xl items-center active:scale-95 ${selectedPeriod === period ? 'bg-primary shadow-sm' : 'bg-transparent'
-                  }`}
-              >
-                <Text
-                  className={`font-body font-bold text-sm ${selectedPeriod === period ? 'text-white' : 'text-text-secondary dark:text-gray-400'
+    expenses.forEach(tx => {
+      categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
+    });
+
+    return Object.entries(categoryTotals)
+      .map(([category, amount]) => ({
+        label: category.charAt(0).toUpperCase() + category.slice(1),
+        value: amount,
+        percentage: totalExp > 0 ? (amount / totalExp) * 100 : 0,
+        color: getColorForCategory(category)
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 4);
+  }, [transactions]);
+
+  function getColorForCategory(cat: string) {
+    if (cat.toLowerCase().includes('food')) return '#A78BFA'; // Purple-400
+    if (cat.toLowerCase().includes('shopping')) return '#36e27b'; // Primary
+    if (cat.toLowerCase().includes('transport')) return '#60A5FA'; // Blue-400
+    return '#9CA3AF'; // Gray-500
+  }
+
+  return (
+    <View className="flex-1 bg-background-light dark:bg-background-dark">
+      {/* Header */}
+      <View className="pt-12 pb-2 px-6 bg-background-dark/80 flex-row items-center justify-between z-20">
+        <View className="flex-row items-center gap-3">
+          <View className="relative">
+            <View className="absolute -inset-0.5 bg-gradient-to-r from-primary to-blue-600 rounded-full opacity-30 blur-sm" />
+            <Image
+              source={{ uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuDj0wuqHI0ukw-riUMhtLexclGOzLXf1NyQ9j-jRuLnMfww2tGGHo5r50qONfnQtsPnppnF5udGUrbEEMhiXhgzfNm1Rt9teVFMX5M0GreLyzQGvYTibJ4El7IRZGIbc21LTicITXZuKXYh0MRF4fIOyb4zIMpZ5OYrGS3ZyDH8a177CZT2Hv3GQ5agQ5odrEb5pasBmrrGbNxeXvB0EHN0_1ZzB50m0i0bg-Cw7BGmBXyMKsMlxWHH72l3--8KWksBCEvLSlAE3uY" }}
+              className="w-10 h-10 rounded-full border border-white/10"
+            />
+          </View>
+          <View>
+            <Text className="text-xs text-gray-400 font-medium tracking-wide font-display">Welcome back</Text>
+            <Text className="text-white text-xl font-bold leading-none tracking-tight font-display">MoneyMind</Text>
+          </View>
+        </View>
+        <GlassPanel className="w-10 h-10 rounded-full items-center justify-center">
+          <Pressable className="w-full h-full items-center justify-center">
+            <Bell size={24} color="white" />
+            <View className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full shadow-[0_0_12px_rgba(54,226,123,0.4)]" />
+          </Pressable>
+        </GlassPanel>
+      </View>
+
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        {/* Month Selector */}
+        <View className="px-6 py-4">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="overflow-visible">
+            <View className="flex-row gap-3">
+              {months.map((month) => (
+                <Pressable
+                  key={month}
+                  onPress={() => setSelectedMonth(month)}
+                  className={`h-9 px-5 rounded-full items-center justify-center ${selectedMonth === month
+                    ? 'bg-primary shadow-[0_0_15px_rgba(54,226,123,0.3)]'
+                    : 'bg-white/5 border border-white/5'
                     }`}
                 >
-                  {period.charAt(0).toUpperCase() + period.slice(1)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </FadeInView>
-
-        {/* Summary Cards */}
-        <FadeInView delay={100} className="mb-6">
-          <View className="flex-row gap-3">
-            <View className="flex-1 bg-card-light dark:bg-card-dark p-4 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800">
-              <View className="flex-row items-center mb-2">
-                <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2">
-                  <TrendingUp size={16} color="#2ECC71" strokeWidth={2.5} />
-                </View>
-                <Text className="text-xs font-body font-semibold text-text-secondary uppercase">Income</Text>
-              </View>
-              <Text className="text-xl font-mono font-bold text-primary">
-                {formatCurrency(totalIncome)}
-              </Text>
+                  <Text className={`text-sm font-display ${selectedMonth === month ? 'font-bold text-black' : 'font-medium text-gray-400'
+                    }`}>
+                    {month}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
+          </ScrollView>
+        </View>
 
-            <View className="flex-1 bg-card-light dark:bg-card-dark p-4 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800">
-              <View className="flex-row items-center mb-2">
-                <View className="w-8 h-8 rounded-full bg-accent/10 items-center justify-center mr-2">
-                  <TrendingDown size={16} color="#FF6B6B" strokeWidth={2.5} />
-                </View>
-                <Text className="text-xs font-body font-semibold text-text-secondary uppercase">Expenses</Text>
-              </View>
-              <Text className="text-xl font-mono font-bold text-accent">
-                {formatCurrency(totalExpense)}
-              </Text>
+        {/* Stats Overview */}
+        <View className="flex-row gap-4 px-6 mb-6">
+          <GlassPanelHighlight className="flex-1 p-5 justify-between min-h-[140px]">
+            <View className="absolute -right-4 -top-4 bg-primary/10 w-20 h-20 rounded-full blur-xl" />
+            <View className="flex-row justify-between items-start z-10">
+              <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider font-display">Total Balance</Text>
+              <Wallet size={20} color="#36e27b" />
             </View>
-          </View>
+            <View className="z-10">
+              <Text className="text-white text-2xl font-bold tracking-tight mb-1 font-display">{formatCurrency(totals.balance)}</Text>
+              <View className="flex-row items-center gap-1 bg-white/5 self-start px-2 py-0.5 rounded-md">
+                <TrendingUp size={12} color="#36e27b" />
+                <Text className="text-primary text-xs font-bold font-display">+3.2%</Text>
+              </View>
+            </View>
+          </GlassPanelHighlight>
 
-          <View className="bg-card-light dark:bg-card-dark p-4 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 mt-3">
-            <View className="flex-row items-center justify-between">
+          <GlassPanel className="flex-1 p-5 justify-between min-h-[140px]">
+            <View className="flex-row justify-between items-start z-10">
+              <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider font-display">Net Change</Text>
+              <TrendingUp size={20} color="rgba(255,255,255,0.5)" />
+            </View>
+            <View className="z-10">
+              <Text className="text-white text-2xl font-bold tracking-tight mb-1 font-display">
+                {totals.income - totals.expense >= 0 ? '+' : ''}{formatCurrency(totals.income - totals.expense)}
+              </Text>
+              <Text className="text-gray-500 text-xs font-normal font-display">vs last month</Text>
+            </View>
+          </GlassPanel>
+        </View>
+
+        {/* Income vs Expenses Chart */}
+        <View className="px-6 mb-6">
+          <GlassPanel className="p-6">
+            <View className="flex-row justify-between items-end mb-6">
               <View>
-                <Text className="text-xs font-body font-semibold text-text-secondary uppercase mb-1">
-                  Net Savings
-                </Text>
-                <Text className={`text-2xl font-mono font-bold ${netSavings >= 0 ? 'text-primary' : 'text-accent'}`}>
-                  {formatCurrency(netSavings)}
+                <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 font-display">Income vs Expenses</Text>
+                <Text className="text-white text-2xl font-bold font-display">
+                  {formatCurrency(totals.income)} <Text className="text-primary font-normal text-lg">In</Text>
                 </Text>
               </View>
-              <View className={`px-4 py-2 rounded-full ${netSavings >= 0 ? 'bg-primary/10' : 'bg-accent/10'}`}>
-                <Text className={`text-sm font-body font-bold ${netSavings >= 0 ? 'text-primary' : 'text-accent'}`}>
-                  {netSavings >= 0 ? '+' : ''}{((netSavings / (totalIncome || 1)) * 100).toFixed(1)}%
-                </Text>
+              <View className="flex-row gap-2">
+                <View className="flex-row items-center gap-1.5">
+                  <View className="w-2 h-2 rounded-full bg-primary shadow-[0_0_12px_rgba(54,226,123,0.4)]" />
+                  <Text className="text-xs text-gray-400 font-display">In</Text>
+                </View>
+                <View className="flex-row items-center gap-1.5">
+                  <View className="w-2 h-2 rounded-full bg-white/20" />
+                  <Text className="text-xs text-gray-400 font-display">Out</Text>
+                </View>
               </View>
             </View>
-          </View>
-        </FadeInView>
 
-        {/* Expense Chart */}
-        {expenseChartData.length > 0 && (
-          <FadeInView delay={150} className="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 mb-6">
-            <View className="flex-row items-center justify-between mb-5">
-              <Text className="text-xl font-display font-bold text-text-primary dark:text-text-dark">
-                Expenses Trend
-              </Text>
-              <View className="w-10 h-10 rounded-full bg-accent/10 items-center justify-center">
-                <TrendingDown size={20} color="#FF6B6B" strokeWidth={2.5} />
-              </View>
-            </View>
-            <BarChart data={expenseChartData} barColor="#FF6B6B" />
-          </FadeInView>
-        )}
-
-        {/* Income Chart */}
-        {incomeChartData.length > 0 && (
-          <FadeInView delay={200} className="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 mb-6">
-            <View className="flex-row items-center justify-between mb-5">
-              <Text className="text-xl font-display font-bold text-text-primary dark:text-text-dark">
-                Income Trend
-              </Text>
-              <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
-                <TrendingUp size={20} color="#2ECC71" strokeWidth={2.5} />
-              </View>
-            </View>
-            <BarChart data={incomeChartData} barColor="#2ECC71" />
-          </FadeInView>
-        )}
-
-        {/* Top Categories */}
-        {categoryData.length > 0 && (
-          <FadeInView delay={250} className="bg-card-light dark:bg-card-dark p-6 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 mb-6">
-            <View className="flex-row items-center justify-between mb-5">
-              <Text className="text-xl font-display font-bold text-text-primary dark:text-text-dark">
-                Top Spending Categories
-              </Text>
-              <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
-                <PieChartIcon size={20} color="#2ECC71" strokeWidth={2.5} />
-              </View>
-            </View>
-            <View className="space-y-3">
-              {categoryData.map((category, index) => {
-                const percentage = (category.value / totalExpense) * 100;
-                const colors = ['#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
-                return (
-                  <View key={index}>
-                    <View className="flex-row justify-between items-center mb-2">
-                      <View className="flex-row items-center flex-1">
-                        <View
-                          className="w-3 h-3 rounded-full mr-3"
-                          style={{ backgroundColor: colors[index % colors.length] }}
-                        />
-                        <Text className="text-base font-body font-semibold text-text-primary dark:text-text-dark">
-                          {category.label}
-                        </Text>
-                      </View>
-                      <Text className="text-base font-mono font-bold text-text-primary dark:text-text-dark">
-                        {formatCurrency(category.value)}
-                      </Text>
-                    </View>
-                    <View className="bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
-                      <View
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${percentage}%`,
-                          backgroundColor: colors[index % colors.length],
-                        }}
-                      />
-                    </View>
-                    <Text className="text-xs font-body text-text-secondary mt-1 text-right">
-                      {percentage.toFixed(1)}% of total
-                    </Text>
+            {/* Mock Bar Chart Viz - In a real app use dynamic data */}
+            <View className="flex-row justify-between h-[160px] items-end px-2">
+              {[1, 2, 3, 4].map((week) => (
+                <View key={week} className="flex-col items-center gap-2 h-full justify-end flex-1 mx-1">
+                  <View className="relative w-full flex-row justify-center gap-1 h-full items-end">
+                    <View className="w-2.5 bg-white/20 rounded-t-sm" style={{ height: `${30 + Math.random() * 30}%` }} />
+                    <View className="w-2.5 bg-primary rounded-t-sm shadow-[0_0_12px_rgba(54,226,123,0.4)]" style={{ height: `${40 + Math.random() * 50}%` }} />
                   </View>
-                );
-              })}
+                  <Text className="text-gray-500 text-[10px] font-bold uppercase font-display">Wk {week}</Text>
+                </View>
+              ))}
             </View>
-          </FadeInView>
-        )}
+          </GlassPanel>
+        </View>
 
-        {/* Empty State */}
-        {transactions.length === 0 && (
-          <FadeInView delay={100} className="bg-card-light dark:bg-card-dark p-8 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 items-center">
-            <View className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mb-4">
-              <Calendar size={32} color="#6B7280" strokeWidth={2} />
+        {/* Spending Mix Chart */}
+        <View className="px-6 mb-6">
+          <GlassPanel className="p-6">
+            <View className="flex-row justify-between items-start mb-6">
+              <View>
+                <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 font-display">Spending Mix</Text>
+                <Text className="text-white text-2xl font-bold font-display">
+                  {formatCurrency(totals.expense)} <Text className="text-gray-400 font-normal text-lg">Out</Text>
+                </Text>
+              </View>
+              <Pressable className="w-8 h-8 items-center justify-center rounded-full bg-white/5">
+                <MoreHorizontal size={18} color="white" />
+              </Pressable>
             </View>
-            <Text className="text-xl font-display font-bold text-text-primary dark:text-text-dark mb-2 text-center">
-              No Data Yet
-            </Text>
-            <Text className="text-sm font-body text-text-secondary text-center">
-              Start adding transactions to see your analytics and spending patterns
-            </Text>
-          </FadeInView>
-        )}
 
-        <View className="h-32" />
+            <View className="gap-5">
+              {categoryData.length > 0 ? categoryData.map((item, index) => (
+                <View key={index} className="gap-2">
+                  <View className="flex-row justify-between">
+                    <View className="flex-row items-center gap-2">
+                      <View className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color, shadowColor: item.color, shadowOpacity: 0.6, shadowRadius: 8, elevation: 5 }} />
+                      <Text className="text-white font-medium text-sm font-display">{item.label}</Text>
+                    </View>
+                    <Text className="text-white font-bold text-sm font-mono">{formatCurrency(item.value)}</Text>
+                  </View>
+                  <View className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                    <View
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${item.percentage}%`,
+                        backgroundColor: item.color,
+                        shadowColor: item.color,
+                        shadowOpacity: 0.4,
+                      }}
+                    />
+                  </View>
+                </View>
+              )) : (
+                <Text className="text-gray-500 text-sm py-4 text-center font-display">No expenses yet</Text>
+              )}
+            </View>
+          </GlassPanel>
+        </View>
+
+        {/* AI Insights */}
+        <View className="px-6 mb-8">
+          <View className="flex-row items-center gap-2 mb-4">
+            <Zap size={20} color="#36e27b" />
+            <Text className="text-white text-lg font-bold font-display">AI Insights</Text>
+          </View>
+          <View className="gap-3">
+            <GlassPanel className="p-4 flex-row items-start gap-3 border-l-4 border-l-orange-500 relative overflow-hidden">
+              <LinearGradient colors={['rgba(249,115,22,0.1)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 0 }} className="absolute inset-0" />
+              <AlertTriangle size={20} color="#F97316" style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-orange-100 text-sm leading-relaxed font-body">
+                  <Text className="text-white font-bold">Alert: </Text>
+                  You spent <Text className="text-white font-bold">25% more</Text> on food this month compared to your average.
+                </Text>
+              </View>
+            </GlassPanel>
+
+            <GlassPanel className="p-4 flex-row items-start gap-3 border-l-4 border-l-primary relative overflow-hidden">
+              <LinearGradient colors={['rgba(54,226,123,0.1)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 0 }} className="absolute inset-0" />
+              <Trophy size={20} color="#36e27b" style={{ marginTop: 2 }} />
+              <View className="flex-1">
+                <Text className="text-green-100 text-sm leading-relaxed font-body">
+                  <Text className="text-white font-bold">Top Category: </Text>
+                  {categoryData[0]?.label || 'Shopping'} is your highest expense category at <Text className="text-white font-bold">{formatCurrency(categoryData[0]?.value || 0)}</Text>.
+                </Text>
+              </View>
+            </GlassPanel>
+          </View>
+        </View>
+
+        {/* Export Actions */}
+        <View className="px-6 mb-8 flex-row gap-4">
+          <Pressable className="flex-1 h-12 rounded-xl border border-white/10 bg-white/5 flex-row items-center justify-center gap-2 active:scale-95 transition-transform">
+            <FileText size={20} color="white" />
+            <Text className="text-white text-sm font-bold font-display">Export PDF</Text>
+          </Pressable>
+          <Pressable className="flex-1 h-12 rounded-xl border border-white/10 bg-white/5 flex-row items-center justify-center gap-2 active:scale-95 transition-transform">
+            <TableProperties size={20} color="white" />
+            <Text className="text-white text-sm font-bold font-display">Export CSV</Text>
+          </Pressable>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

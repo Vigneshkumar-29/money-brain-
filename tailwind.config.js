@@ -6,15 +6,18 @@ module.exports = {
     extend: {
       colors: {
         background: {
-          light: "#FAFAF8",
-          dark: "#0F1419",
+          light: "#f6f8f7",
+          dark: "#050a07",
         },
         card: {
           light: "#FFFFFF",
           dark: "#1A1F26",
         },
-        primary: "#2ECC71",
+        primary: "#36e27b",
         accent: "#FF6B6B",
+        "glass-surface": "rgba(255, 255, 255, 0.03)",
+        "glass-border": "rgba(255, 255, 255, 0.08)",
+        "glass-highlight": "rgba(255, 255, 255, 0.1)",
         text: {
           primary: "#0F1419",
           secondary: "#6B7280",

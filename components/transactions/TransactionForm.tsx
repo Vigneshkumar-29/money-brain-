@@ -1,62 +1,87 @@
 import { View, Text, TextInput, Pressable, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import React, { useState } from 'react';
 import { useTransactions, Transaction } from '../../context/TransactionContext';
-import { X, Calendar, DollarSign, Coffee, ShoppingBag, Home, Car, Utensils, Zap, FileText, TrendingUp, Briefcase, Gift, Heart, Smartphone } from 'lucide-react-native';
+import {
+  X,
+  Utensils,
+  ShoppingBag,
+  Car, // flight_takeoff -> Plane if available, else Car/Map
+  Zap, // bolt
+  Heart, // cardiology -> Heart
+  CheckCircle,
+  Delete, // backspace
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import FadeInView from '../ui/FadeInView';
+import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+
+// Mapping categories to icons matching the design request as close as possible with Lucide
+const CATEGORIES_CONFIG: Record<string, { label: string, icon: any }> = {
+  food: { label: 'Food', icon: Utensils },
+  travel: { label: 'Travel', icon: Car }, // Using Car as generic travel or Plane if available in specific version
+  bills: { label: 'Bills', icon: Zap },
+  shopping: { label: 'Shopping', icon: ShoppingBag },
+  health: { label: 'Health', icon: Heart },
+};
+
+const EXPENSE_CATEGORIES = Object.keys(CATEGORIES_CONFIG).map(id => ({ id, ...CATEGORIES_CONFIG[id] }));
+
+// For now, mocking categories for other types if needed, or reusing
+const INCOME_CATEGORIES = [
+  { id: 'salary', label: 'Salary', icon: ArrowDown },
+  { id: 'freelance', label: 'Freelance', icon: ArrowUp },
+];
 
 interface TransactionFormProps {
   onClose?: () => void;
   initialTransaction?: Transaction;
 }
 
-const EXPENSE_CATEGORIES = [
-  { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
-  { id: 'shopping', label: 'Shopping', icon: ShoppingBag, color: '#4ECDC4' },
-  { id: 'transport', label: 'Transport', icon: Car, color: '#95E1D3' },
-  { id: 'home', label: 'Home & Rent', icon: Home, color: '#F38181' },
-  { id: 'utilities', label: 'Utilities', icon: Zap, color: '#AA96DA' },
-  { id: 'entertainment', label: 'Entertainment', icon: Smartphone, color: '#FFA07A' },
-  { id: 'healthcare', label: 'Healthcare', icon: Heart, color: '#FF69B4' },
-  { id: 'other', label: 'Other', icon: Coffee, color: '#FCBAD3' },
-];
-
-const INCOME_CATEGORIES = [
-  { id: 'salary', label: 'Salary', icon: DollarSign, color: '#2ECC71' },
-  { id: 'freelance', label: 'Freelance', icon: Briefcase, color: '#3498DB' },
-  { id: 'investment', label: 'Investment', icon: TrendingUp, color: '#9B59B6' },
-  { id: 'gift', label: 'Gift', icon: Gift, color: '#E74C3C' },
-  { id: 'other', label: 'Other Income', icon: DollarSign, color: '#1ABC9C' },
-];
-
 export default function TransactionForm({ onClose, initialTransaction }: TransactionFormProps) {
-  const [type, setType] = useState<'expense' | 'income'>(initialTransaction?.type || 'expense');
+  const [type, setType] = useState<'expense' | 'income' | 'lent' | 'borrowed'>(
+    (initialTransaction?.type as any) || 'expense'
+  );
+
   const { addTransaction, updateTransaction } = useTransactions();
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState(initialTransaction?.amount.toString() || '');
-  const [selectedCategory, setSelectedCategory] = useState(initialTransaction?.category || '');
+  const [selectedCategory, setSelectedCategory] = useState(initialTransaction?.category || 'food');
   const [date, setDate] = useState(initialTransaction?.date ? new Date(initialTransaction.date) : new Date());
-  const [note, setNote] = useState(initialTransaction?.title || '');
-  const [showDatePicker, setShowDatePicker] = useState(false);
+
   const insets = useSafeAreaInsets();
 
-  const handleSave = async () => {
-    if (!amount || !selectedCategory || loading) {
-      return;
+  const handleKeyPress = (key: string) => {
+    if (key === 'backspace') {
+      setAmount(prev => prev.slice(0, -1));
+    } else if (key === '.') {
+      if (!amount.includes('.')) {
+        setAmount(prev => prev + key);
+      }
+    } else {
+      // Prevent too many decimals
+      if (amount.includes('.') && amount.split('.')[1].length >= 2) return;
+      setAmount(prev => prev + key);
     }
+  };
+
+  const handleSave = async () => {
+    if (!amount || !selectedCategory || loading) return;
 
     setLoading(true);
     try {
-      const categoryData = categories.find(c => c.id === selectedCategory);
-
       const transactionData = {
         amount: parseFloat(amount),
-        title: note || categoryData?.label || 'Transaction',
-        type,
+        title: CATEGORIES_CONFIG[selectedCategory]?.label || selectedCategory, // Simplification for title
+        type: type,
         category: selectedCategory,
         date: date.toISOString(),
-      };
+      } as any;
+      // Note: "lent" and "borrowed" might not exist on the backend type yet, casting to any or adjust context type.
+      // Assuming context handles 'expense' | 'income' primarily. If 'lent'/'borrowed' are valid, remove 'as any'.
 
       if (initialTransaction) {
         await updateTransaction(initialTransaction.id, transactionData);
@@ -72,239 +97,134 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
     }
   };
 
-  const categories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
-
-  const formatDate = (date: Date) => {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-  };
-
   return (
-    <View className="flex-1 bg-background-light dark:bg-background-dark">
-      {/* Header */}
-      <View
-        style={{ paddingTop: insets.top }}
-        className="px-5 pb-4 pt-2 border-b border-gray-100 dark:border-gray-800"
-      >
-        <FadeInView delay={0}>
-          <View className="flex-row justify-between items-center mb-6">
-            <Pressable
-              onPress={onClose}
-              className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center active:opacity-70"
-            >
-              <X size={22} color="#6B7280" strokeWidth={2.5} />
-            </Pressable>
-            <Text className="text-2xl font-display font-bold text-text-primary dark:text-text-dark">
-              {initialTransaction ? 'Edit Transaction' : 'New Transaction'}
-            </Text>
-            <View className="w-10" />
-          </View>
+    <View className="flex-1 bg-white dark:bg-[#122118]">
+      {/* Background Gradients */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.05)', 'rgba(0,0,0,0.1)']}
+        className="absolute inset-0 z-0"
+      />
+      <View className="absolute top-[-10%] left-[-20%] w-[300px] h-[300px] bg-primary/10 rounded-full blur-[100px]" />
+      <View className="absolute bottom-[10%] right-[-10%] w-[250px] h-[250px] bg-blue-500/10 rounded-full blur-[80px]" />
 
-          {/* Type Selector */}
-          <View className="flex-row bg-card-light dark:bg-card-dark border border-gray-200 dark:border-gray-700 rounded-2xl p-1.5 shadow-sm">
-            <Pressable
-              onPress={() => {
-                setType('expense');
-                setSelectedCategory('');
-              }}
-              className={`flex-1 py-3 rounded-xl items-center active:scale-95 ${type === 'expense' ? 'bg-accent shadow-sm' : 'bg-transparent'
-                }`}
-            >
-              <Text className={`font-body font-bold text-base ${type === 'expense' ? 'text-white' : 'text-text-secondary dark:text-gray-400'
-                }`}>
-                Expense
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setType('income');
-                setSelectedCategory('');
-              }}
-              className={`flex-1 py-3 rounded-xl items-center active:scale-95 ${type === 'income' ? 'bg-primary shadow-sm' : 'bg-transparent'
-                }`}
-            >
-              <Text className={`font-body font-bold text-base ${type === 'income' ? 'text-white' : 'text-text-secondary dark:text-gray-400'
-                }`}>
-                Income
-              </Text>
-            </Pressable>
-          </View>
-        </FadeInView>
+      {/* Header with Back Button */}
+      <View
+        style={{ paddingTop: Math.max(insets.top, 20) }}
+        className="px-6 pb-2 flex-row items-center z-10"
+      >
+        <Pressable
+          onPress={onClose}
+          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-white/5 items-center justify-center active:bg-gray-200 dark:active:bg-white/10"
+        >
+          <ArrowLeft size={24} color={Platform.OS === 'ios' ? '#000' : 'gray'} className="dark:text-white text-black" />
+        </Pressable>
+        <Text className="text-xl font-bold ml-4 font-display text-gray-900 dark:text-white">
+          {initialTransaction ? 'Edit Transaction' : 'New Transaction'}
+        </Text>
       </View>
 
-      <ScrollView className="flex-1 px-5 py-6" showsVerticalScrollIndicator={false}>
-        {/* Amount Input */}
-        <FadeInView delay={50} className="mb-6">
-          <Text className="text-text-secondary font-body text-xs font-bold mb-3 uppercase tracking-wide">
-            Amount
-          </Text>
-          <View className="bg-card-light dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-2xl px-5 py-4 shadow-md">
-            <View className="flex-row items-center">
-              <Text className={`text-3xl font-mono font-bold ${amount ? 'text-primary' : 'text-gray-400'
-                }`}>
-                ₹
-              </Text>
-              <TextInput
-                className="flex-1 ml-2 text-3xl font-mono font-bold text-text-primary dark:text-text-dark"
-                placeholder="0.00"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="decimal-pad"
-                value={amount}
-                onChangeText={setAmount}
-                autoFocus
-              />
-            </View>
-          </View>
-          {!amount && (
-            <Text className="text-red-500 text-xs font-body font-medium mt-2 ml-2">
-              Please enter an amount
-            </Text>
-          )}
-        </FadeInView>
+      <ScrollView className="flex-1 px-6 z-10" showsVerticalScrollIndicator={false}>
 
-        {/* Category Selector */}
-        <FadeInView delay={100} className="mb-6">
-          <Text className="text-text-secondary font-body text-xs font-bold mb-3 uppercase tracking-wide">
-            Category
-          </Text>
-          <View className="flex-row flex-wrap gap-3">
-            {categories.map((cat) => {
+        {/* Amount Display */}
+        <View className="items-center justify-center py-8">
+          <View className="flex-row items-center justify-center relative">
+            <Text className="text-gray-800 dark:text-white text-[3.5rem] leading-none font-bold tracking-tight font-display">
+              ${amount || '0'}
+            </Text>
+            <View className="h-10 w-1 bg-primary ml-1 rounded-full" />
+          </View>
+        </View>
+
+        {/* Transaction Type Switcher */}
+        <View className="mb-8">
+          <View className="flex-row p-1.5 bg-gray-100 dark:bg-[#0d1811] rounded-full border border-gray-200 dark:border-white/5 shadow-inner">
+            {['expense', 'income', 'lent', 'borrowed'].map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => setType(t as any)}
+                className={`flex-1 py-2.5 rounded-full items-center justify-center ${type === t ? 'bg-white dark:bg-primary shadow-sm' : ''}`}
+              >
+                <Text className={`text-sm font-semibold capitalize ${type === t ? 'text-black dark:text-background-dark' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {t}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Category Section */}
+        <View className="mb-6">
+          <View className="flex-row justify-between items-end px-1 mb-4">
+            <Text className="text-xs font-bold tracking-widest text-gray-400 dark:text-primary/60 uppercase font-display">Category</Text>
+            <Text className="text-xs text-primary font-medium">View All</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row -mx-6 px-6 pb-2">
+            {EXPENSE_CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               const isSelected = selectedCategory === cat.id;
               return (
                 <Pressable
                   key={cat.id}
                   onPress={() => setSelectedCategory(cat.id)}
-                  className={`flex-1 min-w-[30%] bg-card-light dark:bg-card-dark border rounded-2xl p-4 active:scale-95 shadow-md ${isSelected
-                    ? 'border-primary'
-                    : 'border-gray-100 dark:border-gray-800'
-                    }`}
-                  style={{ minWidth: '30%' }}
+                  className="mr-3"
                 >
-                  <View
-                    className="w-12 h-12 rounded-2xl items-center justify-center mb-2 self-center"
-                    style={{ backgroundColor: cat.color + '20' }}
-                  >
-                    <Icon size={24} color={cat.color} strokeWidth={2.5} />
+                  <View className={`flex-row h-10 items-center justify-center gap-2 rounded-full pl-3 pr-5 border ${isSelected ? 'bg-primary border-transparent' : 'bg-gray-100 dark:bg-white/5 border-transparent dark:border-white/10'}`}>
+                    <Icon size={20} color={isSelected ? '#112117' : '#9CA3AF'} />
+                    <Text className={`text-sm font-medium ${isSelected ? 'text-[#112117]' : 'text-gray-700 dark:text-gray-200'}`}>{cat.label}</Text>
                   </View>
-                  <Text
-                    className={`font-body font-semibold text-xs text-center ${isSelected ? 'text-primary' : 'text-text-primary dark:text-text-dark'
-                      }`}
-                    numberOfLines={2}
-                  >
-                    {cat.label}
-                  </Text>
                 </Pressable>
               );
             })}
-          </View>
-          {!selectedCategory && (
-            <Text className="text-red-500 text-xs font-body font-medium mt-2 ml-2">
-              Please select a category
-            </Text>
-          )}
-        </FadeInView>
+          </ScrollView>
+        </View>
 
-        {/* Date Selector */}
-        <FadeInView delay={150} className="mb-6">
-          <Text className="text-text-secondary font-body text-xs font-bold mb-3 uppercase tracking-wide">
-            Date
-          </Text>
+        {/* Numeric Keypad */}
+        <View className="flex-wrap flex-row justify-between gap-y-2 mb-4 px-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0, 'backspace'].map((key) => {
+            const isIcon = key === 'backspace';
+            return (
+              <Pressable
+                key={key}
+                onPress={() => handleKeyPress(key.toString())}
+                className="w-[30%] h-16 rounded-full items-center justify-center active:bg-gray-100 dark:active:bg-white/10"
+              >
+                {isIcon ? (
+                  <Delete size={28} color={Platform.OS === 'ios' ? 'white' : 'gray'} className="dark:text-white text-gray-900" />
+                ) : (
+                  <Text className="text-3xl font-normal text-gray-900 dark:text-white font-display">
+                    {key}
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Save Action */}
+        <View className="pb-8 pt-2">
           <Pressable
-            onPress={() => setShowDatePicker(true)}
-            className="bg-card-light dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-2xl p-5 shadow-md active:opacity-70 flex-row items-center"
+            onPress={handleSave}
+            disabled={loading || !amount}
+            className="w-full h-16 bg-primary rounded-full flex-row items-center justify-center gap-3 shadow-lg active:scale-[0.98]"
+            style={{
+              shadowColor: '#36e27b',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+            }}
           >
-            <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center mr-4">
-              <Calendar size={20} color="#2ECC71" strokeWidth={2.5} />
-            </View>
-            <View className="flex-1">
-              <Text className="text-xs font-body font-medium text-text-secondary mb-1">
-                Transaction Date
-              </Text>
-              <Text className="text-base font-body font-bold text-text-primary dark:text-text-dark">
-                {formatDate(date)}
-              </Text>
-            </View>
+            {loading ? (
+              <ActivityIndicator color="#112117" />
+            ) : (
+              <>
+                <CheckCircle size={24} color="#112117" />
+                <Text className="text-[#112117] font-bold text-lg font-display tracking-wide">Save Transaction</Text>
+              </>
+            )}
           </Pressable>
-          {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(Platform.OS === 'ios');
-                if (event.type === 'set' && selectedDate) {
-                  setShowDatePicker(false);
-                  setDate(selectedDate);
-                } else if (event.type === 'dismissed') {
-                  setShowDatePicker(false);
-                }
-              }}
-              maximumDate={new Date()}
-            />
-          )}
-        </FadeInView>
+        </View>
 
-        {/* Note Input */}
-        <FadeInView delay={200} className="mb-6">
-          <Text className="text-text-secondary font-body text-xs font-bold mb-3 uppercase tracking-wide">
-            Note (Optional)
-          </Text>
-          <View className="bg-card-light dark:bg-card-dark border border-gray-100 dark:border-gray-800 rounded-2xl p-5 shadow-md min-h-[100px]">
-            <View className="flex-row items-center mb-2">
-              <FileText size={18} color="#9CA3AF" strokeWidth={2.5} />
-              <Text className="text-xs font-body font-medium text-text-secondary ml-2">
-                Add description
-              </Text>
-            </View>
-            <TextInput
-              className="flex-1 text-base font-body font-medium text-text-primary dark:text-text-dark"
-              placeholder="e.g., Lunch with team, Monthly rent..."
-              placeholderTextColor="#9CA3AF"
-              multiline
-              textAlignVertical="top"
-              value={note}
-              onChangeText={setNote}
-              numberOfLines={3}
-            />
-          </View>
-        </FadeInView>
-
-        <View className="h-24" />
       </ScrollView>
-
-      {/* Fixed Bottom Save Button */}
-      <View
-        style={{ paddingBottom: insets.bottom || 20 }}
-        className="px-5 py-4 border-t border-gray-100 dark:border-gray-800 bg-card-light dark:bg-card-dark"
-      >
-        <Pressable
-          onPress={handleSave}
-          disabled={!amount || !selectedCategory || loading}
-          className={`py-4 rounded-2xl items-center justify-center active:scale-95 shadow-md ${amount && selectedCategory
-            ? 'bg-primary'
-            : 'bg-gray-200 dark:bg-gray-800'
-            }`}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text className={`font-body font-bold text-lg ${amount && selectedCategory ? 'text-white' : 'text-gray-500'
-              }`}>
-              {initialTransaction ? 'Update Transaction' : 'Save Transaction'}
-            </Text>
-          )}
-        </Pressable>
-      </View>
     </View>
   );
 }
