@@ -4,8 +4,10 @@
 -- Step 1: Drop the trigger
 DROP TRIGGER IF EXISTS update_transactions_updated_at ON transactions;
 
--- Step 2: Drop the function
-DROP FUNCTION IF EXISTS update_updated_at_column();
+-- Step 2: Drop the function (Optional - kept because it is used by 'profiles' table)
+-- We skip dropping the function to avoid error: "cannot drop function ... because other objects depend on it"
+-- The trigger on 'profiles' still needs this function.
+-- DROP FUNCTION IF EXISTS update_updated_at_column();
 
 -- Step 3: Ensure updated_at column exists (optional, can be removed if you don't need it)
 ALTER TABLE transactions 

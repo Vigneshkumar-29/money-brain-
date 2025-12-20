@@ -162,10 +162,17 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
 
     setLoading(true);
     try {
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount)) {
+        alert('Please enter a valid amount');
+        setLoading(false);
+        return;
+      }
+
       console.log('Saving transaction...', {
         isEdit: !!initialTransaction,
         id: initialTransaction?.id,
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         category: selectedCategory,
         type
       });
@@ -175,7 +182,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
       const categoryLabel = categoryObj?.label || selectedCategory;
 
       const transactionData = {
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         title: initialTransaction?.title || categoryLabel,
         type: type,
         category: selectedCategory,

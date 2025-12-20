@@ -58,7 +58,7 @@ export default function TransactionsScreen() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
-  const { transactions, totals, deleteTransaction } = useTransactions();
+  const { transactions, totals, deleteTransaction, loadMore, hasMore, loading } = useTransactions();
 
   // Modal state
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -293,114 +293,132 @@ export default function TransactionsScreen() {
       </View>
 
       {/* Main Content Area */}
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: rs(100) }} showsVerticalScrollIndicator={false}>
-        {/* Transaction History Header */}
-        <View style={{ paddingHorizontal: containerPadding, marginTop: spacing['2xl'], marginBottom: spacing.md }}>
-          <Text style={{ fontSize: typography.xl }} className="font-bold text-white font-display">Transaction History</Text>
-          <Text style={{ fontSize: typography.sm, marginTop: spacing.xs }} className="text-gray-400 font-display">
-            {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transaction' : 'transactions'} found
-          </Text>
-        </View>
-
-        {/* Search Bar */}
-        <View style={{ paddingHorizontal: containerPadding, marginTop: spacing.lg }}>
-          <GlassInput style={{ height: rs(48) }} className="flex-row w-full items-center">
-            <View style={{ paddingLeft: spacing.lg, paddingRight: spacing.sm }}>
-              <Search size={smallIconSize} color="#95c6a9" />
+      <SectionList
+        sections={groupedTransactions}
+        keyExtractor={(item) => item.id}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={{ paddingBottom: rs(100) }}
+        showsVerticalScrollIndicator={false}
+        onEndReached={() => {
+          if (hasMore && !loading) {
+            loadMore();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          <>
+            {/* Transaction History Header */}
+            <View style={{ paddingHorizontal: containerPadding, marginTop: spacing['2xl'], marginBottom: spacing.md }}>
+              <Text style={{ fontSize: typography.xl }} className="font-bold text-white font-display">Transaction History</Text>
+              <Text style={{ fontSize: typography.sm, marginTop: spacing.xs }} className="text-gray-400 font-display">
+                {transactions.length} transactions loaded
+              </Text>
             </View>
-            <TextInput
-              className="flex-1 text-white h-full font-body"
-              style={{ fontSize: typography.base }}
-              placeholder="Search transactions..."
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={search}
-              onChangeText={setSearch}
-            />
-          </GlassInput>
-        </View>
 
-        {/* Filter Chips */}
-        <View style={{ marginTop: spacing['2xl'], paddingLeft: containerPadding }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: containerPadding, gap: spacing.md }}>
-            <Pressable
-              onPress={() => setFilterType('All')}
-              style={{ height: rs(36), paddingHorizontal: spacing.lg }}
-              className={`rounded-full items-center justify-center border ${filterType === 'All' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
-            >
-              <Text style={{ fontSize: typography.sm }} className={`${filterType === 'All' ? 'text-primary' : 'text-white/70'} font-bold`}>All</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setFilterType('Expense')}
-              style={{ height: rs(36), paddingHorizontal: spacing.lg }}
-              className={`rounded-full items-center justify-center border ${filterType === 'Expense' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
-            >
-              <Text style={{ fontSize: typography.sm }} className={`${filterType === 'Expense' ? 'text-primary' : 'text-white/70'} font-bold`}>Expense</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setFilterType('Income')}
-              style={{ height: rs(36), paddingHorizontal: spacing.lg }}
-              className={`rounded-full items-center justify-center border ${filterType === 'Income' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
-            >
-              <Text style={{ fontSize: typography.sm }} className={`${filterType === 'Income' ? 'text-primary' : 'text-white/70'} font-bold`}>Income</Text>
-            </Pressable>
-
-            <GlassPanel style={{ height: rs(36), paddingHorizontal: spacing.lg }} className="flex-row items-center justify-center gap-2 rounded-full">
-              <Tag size={getIconSize(16)} color={filterType === 'Category' ? '#36e27b' : '#36e27b'} />
-              <Text style={{ fontSize: typography.sm }} className="text-white/70 font-medium">Category</Text>
-            </GlassPanel>
-
-            <GlassPanel style={{ height: rs(36), paddingHorizontal: spacing.lg }} className="flex-row items-center justify-center gap-2 rounded-full">
-              <Calendar size={getIconSize(16)} color="#36e27b" />
-              <Text style={{ fontSize: typography.sm }} className="text-white/70 font-medium">Date</Text>
-            </GlassPanel>
-          </ScrollView>
-        </View>
-
-        {/* Transactions List */}
-        <View style={{ marginTop: spacing['2xl'], paddingHorizontal: containerPadding, gap: spacing['2xl'] }}>
-          {groupedTransactions.map((group, groupIndex) => (
-            <View key={group.title || groupIndex} style={{ gap: spacing.md }}>
-              <Text style={{ fontSize: typography.xs, marginLeft: spacing.sm }} className="font-bold text-gray-500 uppercase tracking-[0.2em] font-display">{group.title}</Text>
-              {group.data.map((item) => {
-                const Icon = getCategoryIcon(item.category);
-                const isIncome = item.type === 'income' || item.type === 'lent';
-
-                return (
-                  <GlassPanel
-                    key={item.id}
-                    style={{ padding: spacing.lg, gap: spacing.lg }}
-                    className="flex-row items-center justify-between active:scale-[0.98]"
-                    onPress={() => handleTransactionPress(item)}
-                  >
-                    <View style={{ gap: spacing.lg }} className="flex-row items-center flex-1 overflow-hidden">
-                      <View style={{ width: rs(48), height: rs(48) }} className={`items-center justify-center rounded-full shrink-0 border ${item.type === 'income' ? 'bg-primary/10 border-primary/30' : 'bg-white/5 border-white/10'}`}>
-                        <Icon size={iconSize} color={item.type === 'income' ? '#36e27b' : 'rgba(255,255,255,0.8)'} />
-                      </View>
-                      <View className="flex-1 justify-center">
-                        <Text style={{ fontSize: typography.base }} className="text-white font-bold leading-tight truncate font-display" numberOfLines={1}>{item.title}</Text>
-                        <Text style={{ fontSize: typography.xs, marginTop: spacing.xs }} className={`${item.type === 'income' ? 'text-[#95c6a9]' : 'text-white/50'} font-normal truncate font-body`} numberOfLines={1}>
-                          {item.category} • {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="shrink-0 text-right">
-                      <Text style={{ fontSize: typography.base }} className={`${item.type === 'income' ? 'text-primary' : 'text-red-500'} font-bold leading-normal font-display`}>
-                        {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount)}
-                      </Text>
-                    </View>
-                  </GlassPanel>
-                );
-              })}
+            {/* Search Bar */}
+            <View style={{ paddingHorizontal: containerPadding, marginTop: spacing.lg }}>
+              <GlassInput style={{ height: rs(48) }} className="flex-row w-full items-center">
+                <View style={{ paddingLeft: spacing.lg, paddingRight: spacing.sm }}>
+                  <Search size={smallIconSize} color="#95c6a9" />
+                </View>
+                <TextInput
+                  className="flex-1 text-white h-full font-body"
+                  style={{ fontSize: typography.base }}
+                  placeholder="Search transactions..."
+                  placeholderTextColor="rgba(255,255,255,0.3)"
+                  value={search}
+                  onChangeText={setSearch}
+                />
+              </GlassInput>
             </View>
-          ))}
 
-          {transactions.length === 0 && (
+            {/* Filter Chips */}
+            <View style={{ marginTop: spacing['2xl'], marginBottom: spacing['2xl'], paddingLeft: containerPadding }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: containerPadding, gap: spacing.md }}>
+                <Pressable
+                  onPress={() => setFilterType('All')}
+                  style={{ height: rs(36), paddingHorizontal: spacing.lg }}
+                  className={`rounded-full items-center justify-center border ${filterType === 'All' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
+                >
+                  <Text style={{ fontSize: typography.sm }} className={`${filterType === 'All' ? 'text-primary' : 'text-white/70'} font-bold`}>All</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setFilterType('Expense')}
+                  style={{ height: rs(36), paddingHorizontal: spacing.lg }}
+                  className={`rounded-full items-center justify-center border ${filterType === 'Expense' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
+                >
+                  <Text style={{ fontSize: typography.sm }} className={`${filterType === 'Expense' ? 'text-primary' : 'text-white/70'} font-bold`}>Expense</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setFilterType('Income')}
+                  style={{ height: rs(36), paddingHorizontal: spacing.lg }}
+                  className={`rounded-full items-center justify-center border ${filterType === 'Income' ? 'bg-primary/20 border-primary/50' : 'bg-transparent border-white/10'}`}
+                >
+                  <Text style={{ fontSize: typography.sm }} className={`${filterType === 'Income' ? 'text-primary' : 'text-white/70'} font-bold`}>Income</Text>
+                </Pressable>
+
+                <GlassPanel style={{ height: rs(36), paddingHorizontal: spacing.lg }} className="flex-row items-center justify-center gap-2 rounded-full">
+                  <Tag size={getIconSize(16)} color={filterType === 'Category' ? '#36e27b' : '#36e27b'} />
+                  <Text style={{ fontSize: typography.sm }} className="text-white/70 font-medium">Category</Text>
+                </GlassPanel>
+
+                <GlassPanel style={{ height: rs(36), paddingHorizontal: spacing.lg }} className="flex-row items-center justify-center gap-2 rounded-full">
+                  <Calendar size={getIconSize(16)} color="#36e27b" />
+                  <Text style={{ fontSize: typography.sm }} className="text-white/70 font-medium">Date</Text>
+                </GlassPanel>
+              </ScrollView>
+            </View>
+          </>
+        }
+        renderSectionHeader={({ section: { title } }) => (
+          <View style={{ paddingHorizontal: containerPadding, paddingVertical: spacing.sm, backgroundColor: 'transparent' }}>
+            <Text style={{ fontSize: typography.xs, marginLeft: spacing.sm }} className="font-bold text-gray-500 uppercase tracking-[0.2em] font-display">{title}</Text>
+          </View>
+        )}
+        renderItem={({ item }) => {
+          const Icon = getCategoryIcon(item.category);
+          return (
+            <View style={{ paddingHorizontal: containerPadding, marginBottom: spacing.md }}>
+              <GlassPanel
+                style={{ padding: spacing.lg, gap: spacing.lg }}
+                className="flex-row items-center justify-between active:scale-[0.98]"
+                onPress={() => handleTransactionPress(item)}
+              >
+                <View style={{ gap: spacing.lg }} className="flex-row items-center flex-1 overflow-hidden">
+                  <View style={{ width: rs(48), height: rs(48) }} className={`items-center justify-center rounded-full shrink-0 border ${item.type === 'income' ? 'bg-primary/10 border-primary/30' : 'bg-white/5 border-white/10'}`}>
+                    <Icon size={iconSize} color={item.type === 'income' ? '#36e27b' : 'rgba(255,255,255,0.8)'} />
+                  </View>
+                  <View className="flex-1 justify-center">
+                    <Text style={{ fontSize: typography.base }} className="text-white font-bold leading-tight truncate font-display" numberOfLines={1}>{item.title}</Text>
+                    <Text style={{ fontSize: typography.xs, marginTop: spacing.xs }} className={`${item.type === 'income' ? 'text-[#95c6a9]' : 'text-white/50'} font-normal truncate font-body`} numberOfLines={1}>
+                      {item.category} • {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+                <View className="shrink-0 text-right">
+                  <Text style={{ fontSize: typography.base }} className={`${item.type === 'income' ? 'text-primary' : 'text-red-500'} font-bold leading-normal font-display`}>
+                    {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount)}
+                  </Text>
+                </View>
+              </GlassPanel>
+            </View>
+          );
+        }}
+        ListEmptyComponent={
+          transactions.length === 0 ? (
             <View style={{ paddingVertical: spacing['4xl'] }} className="items-center justify-center opacity-50">
               <Text style={{ fontSize: typography.base }} className="text-white font-display">No transactions found</Text>
             </View>
-          )}
-        </View>
-      </ScrollView>
+          ) : null
+        }
+        ListFooterComponent={
+          loading && transactions.length > 0 ? (
+            <View className="py-4 items-center">
+              <Text className="text-gray-400 text-xs">Loading more...</Text>
+            </View>
+          ) : <View style={{ height: rs(20) }} />
+        }
+      />
 
       {/* Transaction Action Modal */}
       {selectedTransaction && (
