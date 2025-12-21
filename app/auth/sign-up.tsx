@@ -1,10 +1,10 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowRight, Mail, Lock, User, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, Mail, Lock, User, ShieldCheck, AlertCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function SignUpScreen() {
     const router = useRouter();
@@ -14,28 +14,55 @@ export default function SignUpScreen() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const mounted = useRef(true);
+
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     const handleSignUp = async () => {
         if (loading) return;
+        setErrorMsg(null);
 
-        if (!fullName.trim()) {
-            Alert.alert('Error', 'Please enter your full name');
+        if (!fullName.trim() || !email || !password || !confirmPassword) {
+            setErrorMsg('Please fill in all fields.');
+            return;
+        }
+
+        if (password.length < 6) {
+            setErrorMsg('Password must be at least 6 characters long.');
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            setErrorMsg('Passwords do not match.');
             return;
         }
 
         setLoading(true);
+
+        const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 15000)
+        );
+
         try {
-            await signUp(email, password, fullName.trim());
-            Alert.alert('Success', 'Account created! Please check your email for verification.');
+            await Promise.race([signUp(email, password, fullName.trim()), timeout]);
+            if (mounted.current) {
+                Alert.alert('Success', 'Account created! Please check your email for verification.');
+                // We keep loading true or we can navigate. Usually verification is needed.
+                // The context might not auto-login if email needs verification.
+                // But Supabase often allows login or we can redirect to login.
+                router.replace('/auth/login');
+            }
         } catch (error: any) {
-            Alert.alert('Error', error.message);
-        } finally {
-            setLoading(false);
+            if (mounted.current) {
+                setErrorMsg(error.message || 'An unexpected error occurred.');
+                setLoading(false);
+            }
         }
     };
 
@@ -54,23 +81,34 @@ export default function SignUpScreen() {
                     </View>
 
                     <View className="space-y-4">
+                        {errorMsg && (
+                            <View className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex-row items-center mb-2">
+                                <AlertCircle size={20} color="#EF4444" style={{ marginRight: 8 }} />
+                                <Text className="text-red-400 font-body flex-1 text-sm">{errorMsg}</Text>
+                            </View>
+                        )}
+
                         <View className="space-y-2">
                             <Text className="text-text-secondary text-base font-body ml-1">Full Name</Text>
-                            <View className="flex-row items-center bg-card-dark border border-white/5 rounded-2xl px-4 h-14">
+                            <View className={`flex-row items-center bg-card-dark border rounded-2xl px-4 h-14 ${errorMsg && !fullName ? 'border-red-500/30' : 'border-white/5'}`}>
                                 <User size={20} color="#6B7280" />
                                 <TextInput
                                     className="flex-1 ml-3 text-text-dark font-body text-base"
                                     placeholder="John Doe"
                                     placeholderTextColor="#4B5563"
                                     value={fullName}
-                                    onChangeText={setFullName}
+                                    onChangeText={(text) => {
+                                        setFullName(text);
+                                        if (errorMsg) setErrorMsg(null);
+                                    }}
+                                    editable={!loading}
                                 />
                             </View>
                         </View>
 
                         <View className="space-y-2">
                             <Text className="text-text-secondary text-base font-body ml-1">Email Address</Text>
-                            <View className="flex-row items-center bg-card-dark border border-white/5 rounded-2xl px-4 h-14">
+                            <View className={`flex-row items-center bg-card-dark border rounded-2xl px-4 h-14 ${errorMsg && !email ? 'border-red-500/30' : 'border-white/5'}`}>
                                 <Mail size={20} color="#6B7280" />
                                 <TextInput
                                     className="flex-1 ml-3 text-text-dark font-body text-base"
@@ -79,14 +117,18 @@ export default function SignUpScreen() {
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     value={email}
-                                    onChangeText={setEmail}
+                                    onChangeText={(text) => {
+                                        setEmail(text);
+                                        if (errorMsg) setErrorMsg(null);
+                                    }}
+                                    editable={!loading}
                                 />
                             </View>
                         </View>
 
                         <View className="space-y-2">
                             <Text className="text-text-secondary text-base font-body ml-1">Password</Text>
-                            <View className="flex-row items-center bg-card-dark border border-white/5 rounded-2xl px-4 h-14">
+                            <View className={`flex-row items-center bg-card-dark border rounded-2xl px-4 h-14 ${errorMsg && !password ? 'border-red-500/30' : 'border-white/5'}`}>
                                 <Lock size={20} color="#6B7280" />
                                 <TextInput
                                     className="flex-1 ml-3 text-text-dark font-body text-base"
@@ -94,14 +136,18 @@ export default function SignUpScreen() {
                                     placeholderTextColor="#4B5563"
                                     secureTextEntry
                                     value={password}
-                                    onChangeText={setPassword}
+                                    onChangeText={(text) => {
+                                        setPassword(text);
+                                        if (errorMsg) setErrorMsg(null);
+                                    }}
+                                    editable={!loading}
                                 />
                             </View>
                         </View>
 
                         <View className="space-y-2">
                             <Text className="text-text-secondary text-base font-body ml-1">Confirm Password</Text>
-                            <View className="flex-row items-center bg-card-dark border border-white/5 rounded-2xl px-4 h-14">
+                            <View className={`flex-row items-center bg-card-dark border rounded-2xl px-4 h-14 ${errorMsg && password !== confirmPassword ? 'border-red-500/30' : 'border-white/5'}`}>
                                 <ShieldCheck size={20} color="#6B7280" />
                                 <TextInput
                                     className="flex-1 ml-3 text-text-dark font-body text-base"
@@ -109,7 +155,11 @@ export default function SignUpScreen() {
                                     placeholderTextColor="#4B5563"
                                     secureTextEntry
                                     value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
+                                    onChangeText={(text) => {
+                                        setConfirmPassword(text);
+                                        if (errorMsg) setErrorMsg(null);
+                                    }}
+                                    editable={!loading}
                                 />
                             </View>
                         </View>
@@ -133,7 +183,7 @@ export default function SignUpScreen() {
                     <View className="flex-row justify-center mt-8 mb-4">
                         <Text className="text-text-secondary font-body">Already have an account? </Text>
                         <Link href="/auth/login" asChild>
-                            <TouchableOpacity>
+                            <TouchableOpacity disabled={loading}>
                                 <Text className="text-primary font-display">Sign In</Text>
                             </TouchableOpacity>
                         </Link>

@@ -2,10 +2,10 @@ import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } fro
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
-import { ArrowRight, Mail, Lock } from 'lucide-react-native';
+import { ArrowRight, Mail, Lock, AlertCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -13,17 +13,46 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const mounted = useRef(true);
+
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     const handleLogin = async () => {
         if (loading) return;
+        setErrorMsg(null);
+
+        if (!email || !password) {
+            setErrorMsg('Please enter both email and password.');
+            return;
+        }
+
         setLoading(true);
+
+        const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 15000)
+        );
+
         try {
-            await signIn(email, password);
-            // Router redirect is handled in AuthContext
+            await Promise.race([signIn(email, password), timeout]);
+            // If we're here, sign in was successful. 
+            // The AuthContext will handle navigation based on auth state changes.
+            // We keep loading true to prevent user interaction while redirecting.
         } catch (error: any) {
-            Alert.alert('Error', error.message);
-        } finally {
-            setLoading(false);
+            if (mounted.current) {
+                // If it's a specific auth error, display it nicely
+                if (error.message.includes('Invalid login credentials')) {
+                    setErrorMsg('Invalid email or password. Please try again.');
+                } else {
+                    setErrorMsg(error.message || 'An unexpected error occurred.');
+                }
+                setLoading(false);
+            }
         }
     };
 
@@ -41,9 +70,17 @@ export default function LoginScreen() {
                 </View>
 
                 <View className="space-y-4">
+                    {/* Error Message Display */}
+                    {errorMsg && (
+                        <View className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex-row items-center mb-2">
+                            <AlertCircle size={20} color="#EF4444" style={{ marginRight: 8 }} />
+                            <Text className="text-red-400 font-body flex-1 text-sm">{errorMsg}</Text>
+                        </View>
+                    )}
+
                     <View className="space-y-2">
                         <Text className="text-text-secondary text-base font-body ml-1">Email Address</Text>
-                        <View className="flex-row items-center bg-card-dark border border-white/5 rounded-2xl px-4 h-14">
+                        <View className={`flex-row items-center bg-card-dark border rounded-2xl px-4 h-14 ${errorMsg ? 'border-red-500/30' : 'border-white/5'}`}>
                             <Mail size={20} color="#6B7280" />
                             <TextInput
                                 className="flex-1 ml-3 text-text-dark font-body text-base"
@@ -52,14 +89,18 @@ export default function LoginScreen() {
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 value={email}
-                                onChangeText={setEmail}
+                                onChangeText={(text) => {
+                                    setEmail(text);
+                                    if (errorMsg) setErrorMsg(null);
+                                }}
+                                editable={!loading}
                             />
                         </View>
                     </View>
 
                     <View className="space-y-2">
                         <Text className="text-text-secondary text-base font-body ml-1">Password</Text>
-                        <View className="flex-row items-center bg-card-dark border border-white/5 rounded-2xl px-4 h-14">
+                        <View className={`flex-row items-center bg-card-dark border rounded-2xl px-4 h-14 ${errorMsg ? 'border-red-500/30' : 'border-white/5'}`}>
                             <Lock size={20} color="#6B7280" />
                             <TextInput
                                 className="flex-1 ml-3 text-text-dark font-body text-base"
@@ -67,12 +108,16 @@ export default function LoginScreen() {
                                 placeholderTextColor="#4B5563"
                                 secureTextEntry
                                 value={password}
-                                onChangeText={setPassword}
+                                onChangeText={(text) => {
+                                    setPassword(text);
+                                    if (errorMsg) setErrorMsg(null);
+                                }}
+                                editable={!loading}
                             />
                         </View>
                     </View>
 
-                    <TouchableOpacity className="items-end">
+                    <TouchableOpacity className="items-end" disabled={loading}>
                         <Text className="text-primary font-body text-sm">Forgot Password?</Text>
                     </TouchableOpacity>
 
@@ -95,7 +140,7 @@ export default function LoginScreen() {
                 <View className="flex-row justify-center mt-8">
                     <Text className="text-text-secondary font-body">Don't have an account? </Text>
                     <Link href="/auth/sign-up" asChild>
-                        <TouchableOpacity>
+                        <TouchableOpacity disabled={loading}>
                             <Text className="text-primary font-display">Sign Up</Text>
                         </TouchableOpacity>
                     </Link>

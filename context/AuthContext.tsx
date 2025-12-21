@@ -60,25 +60,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            if (session?.user) {
-                fetchProfile(session.user.id);
+        let mounted = true;
+
+        const checkSession = async () => {
+            try {
+                const { data: { session: initialSession } } = await supabase.auth.getSession();
+
+                if (mounted) {
+                    setSession(initialSession);
+                    if (initialSession?.user) {
+                        await fetchProfile(initialSession.user.id);
+                    }
+                    setIsLoading(false);
+                }
+            } catch (error) {
+                console.error('Error checking session:', error);
+                if (mounted) setIsLoading(false);
             }
-            setIsLoading(false);
-        });
+        };
+
+        checkSession();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            setSession(session);
-            if (session?.user) {
-                await fetchProfile(session.user.id);
-            } else {
-                setProfile(null);
+            if (mounted) {
+                setSession(session);
+                if (session?.user) {
+                    // Update profile on auth change
+                    await fetchProfile(session.user.id);
+                } else {
+                    setProfile(null);
+                }
+                setIsLoading(false);
             }
-            setIsLoading(false);
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     useEffect(() => {
@@ -97,11 +116,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [session, segments, isLoading]);
 
     const signIn = async (email: string, password: string) => {
+        // We use signInWithPassword which automatically triggers onAuthStateChange
+        // But we wait for it to ensure any immediate errors are caught
         const { error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
         if (error) throw error;
+        // Success execution will be handled by onAuthStateChange listener
     };
 
     const signUp = async (email: string, password: string, username?: string) => {
@@ -135,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const signOut = async () => {
         await supabase.auth.signOut();
         setProfile(null);
+        setSession(null);
     };
 
     const refreshProfile = async () => {

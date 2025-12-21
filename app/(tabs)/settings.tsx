@@ -65,7 +65,14 @@ export default function Settings() {
 
         <FadeInView delay={150} className="mt-6 mb-10">
           <TouchableOpacity
-            onPress={signOut}
+            onPress={async () => {
+              // Add simple loading or visual feedback if desired
+              try {
+                await signOut();
+              } catch (e) {
+                console.error(e);
+              }
+            }}
             className="flex-row items-center justify-center p-4 bg-red-50 dark:bg-red-500/10 rounded-2xl border border-red-100 dark:border-red-500/20 active:opacity-80"
           >
             <LogOut size={20} color="#EF4444" strokeWidth={2.5} />

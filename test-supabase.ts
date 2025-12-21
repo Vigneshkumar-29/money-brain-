@@ -9,7 +9,7 @@ async function testSupabaseConnection() {
     try {
         // Test 1: Check if Supabase client is initialized
         console.log('✅ Test 1: Supabase client initialized');
-        console.log(`   URL: ${supabase.supabaseUrl}`);
+        // console.log(`   URL: ${supabase.supabaseUrl}`); // Protected property
 
         // Test 2: Test authentication
         console.log('\n📝 Test 2: Testing authentication...');
