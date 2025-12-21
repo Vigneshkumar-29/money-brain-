@@ -20,16 +20,16 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { configureReanimatedLogger, ReanimatedLogLevel } from "react-native-reanimated";
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import "../global.css";
+import { AuthProvider } from "../context/AuthContext";
+import { TransactionProvider } from "../context/TransactionContext";
 
 // Configure Reanimated logger to disable strict mode (suppress false positives during navigation)
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
   strict: false,
 });
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import "../global.css";
-import { AuthProvider } from "../context/AuthContext";
-import { TransactionProvider } from "../context/TransactionContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();

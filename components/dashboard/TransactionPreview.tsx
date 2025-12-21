@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import React from 'react';
 import TransactionItem from '../transactions/TransactionItem';
-import { ShoppingBag, Coffee, ArrowUpRight, ArrowRight } from 'lucide-react-native';
+import { ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTransactions } from '../../context/TransactionContext';
 

@@ -1,8 +1,8 @@
-import { View, Text, Switch, Pressable, Platform, Alert, ScrollView } from 'react-native';
+import { View, Text, Switch, Pressable, Alert, ScrollView } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Bell, BellRing, Clock, Calendar, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, Bell, BellRing, Clock, AlertTriangle } from 'lucide-react-native';
 import FadeInView from '../../components/ui/FadeInView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -15,7 +15,7 @@ let Notifications: typeof import('expo-notifications') | null = null;
 if (!isExpoGo) {
     try {
         Notifications = require('expo-notifications');
-    } catch (e) {
+    } catch {
         console.log('expo-notifications not available');
     }
 }
@@ -25,14 +25,15 @@ export default function NotificationSettings() {
     const [enabled, setEnabled] = useState(false);
     const [dailyReminder, setDailyReminder] = useState(false);
     const [budgetAlerts, setBudgetAlerts] = useState(false);
-    const [notificationsAvailable, setNotificationsAvailable] = useState(!isExpoGo);
+    // const [notificationsAvailable] = useState(!isExpoGo); // Unused state setter, just use isExpoGo or initialized val
+    const notificationsAvailable = !isExpoGo;
 
     useEffect(() => {
         if (notificationsAvailable && Notifications) {
             checkPermissions();
         }
         loadPreferences();
-    }, []);
+    }, [notificationsAvailable]);
 
     async function checkPermissions() {
         if (!Notifications) return;
@@ -48,14 +49,14 @@ export default function NotificationSettings() {
                 setDailyReminder(prefs.dailyReminder);
                 setBudgetAlerts(prefs.budgetAlerts);
             }
-        } catch (e) { }
+        } catch { }
     }
 
     async function savePreferences(key: string, value: boolean) {
         try {
             const current = { dailyReminder, budgetAlerts, [key]: value };
             await AsyncStorage.setItem('notification_prefs', JSON.stringify(current));
-        } catch (e) { }
+        } catch { }
     }
 
     async function toggleNotifications(value: boolean) {

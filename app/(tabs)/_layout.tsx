@@ -1,12 +1,12 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, View, Dimensions } from 'react-native';
+import { Platform, Dimensions } from 'react-native';
 import { Home, BarChart2, Wallet, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { rfs, rs, getIconSize, MIN_TOUCH_TARGET } from '../../lib/responsive';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// const { width: SCREEN_WIDTH } = Dimensions.get('window'); // Unused
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();

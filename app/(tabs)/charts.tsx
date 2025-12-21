@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, Pressable, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// import { SafeAreaView } from 'react-native-safe-area-context'; // Unused
 import React, { useState, useMemo } from 'react';
 import { useTransactions } from '../../context/TransactionContext';
 import { useAuth } from '../../context/AuthContext';
@@ -12,18 +12,12 @@ import {
   TrendingUp,
   MoreHorizontal,
   Zap,
-  Tag,
-  Car,
-  ShoppingBag,
-  Utensils,
   AlertTriangle,
   Trophy,
   FileText,
   TableProperties,
   ArrowRight,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight
+  ArrowLeft
 } from 'lucide-react-native';
 
 const GlassPanel = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: any }) => (
@@ -53,7 +47,7 @@ const GlassPanelHighlight = ({ children, className = "", style = {} }: { childre
 );
 
 export default function AnalyticsScreen() {
-  const { transactions, totals } = useTransactions();
+  const { transactions } = useTransactions(); // totals unused
   const { profile, user } = useAuth();
 
   // Get current month as default

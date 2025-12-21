@@ -1,14 +1,13 @@
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Link } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BlurView } from 'expo-blur';
 import { ArrowRight, Mail, Lock, AlertCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 
 export default function LoginScreen() {
-    const router = useRouter();
+    // const router = useRouter(); // Unused
     const { signIn } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -138,7 +137,7 @@ export default function LoginScreen() {
                 </View>
 
                 <View className="flex-row justify-center mt-8">
-                    <Text className="text-text-secondary font-body">Don't have an account? </Text>
+                    <Text className="text-text-secondary font-body">Don&apos;t have an account? </Text>
                     <Link href="/auth/sign-up" asChild>
                         <TouchableOpacity disabled={loading}>
                             <Text className="text-primary font-display">Sign Up</Text>

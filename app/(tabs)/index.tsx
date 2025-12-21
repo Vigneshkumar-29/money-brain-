@@ -1,15 +1,13 @@
-import { View, Text, ScrollView, Pressable, Dimensions, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import {
   Bell,
-  TrendingUp,
   ArrowDown,
   ArrowUp,
-  ChevronRight,
   Film,
   ShoppingCart,
   DollarSign,
@@ -20,9 +18,9 @@ import {
 import { useRouter } from 'expo-router';
 import { useTransactions } from '../../context/TransactionContext';
 import { useAuth } from '../../context/AuthContext';
-import { rfs, rs, wp, hp, getIconSize, getContainerPadding, spacing, typography } from '../../lib/responsive';
+import { rs, getIconSize, getContainerPadding } from '../../lib/responsive';
 
-const { width } = Dimensions.get('window');
+// const { width } = Dimensions.get('window'); // Unused
 const containerPadding = getContainerPadding();
 
 const GlassPanel = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: any }) => (

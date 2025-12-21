@@ -8,16 +8,13 @@ import {
   Plus,
   Search,
   Calendar,
-  DollarSign,
   Music,
   Utensils,
   ShoppingBag,
-  CreditCard,
   Briefcase,
   Smartphone,
   Home,
   Zap,
-  Coffee,
   Tag,
   Car
 } from 'lucide-react-native';
@@ -77,15 +74,7 @@ export default function TransactionsScreen() {
     return Tag;
   };
 
-  const getIconColor = (category: string, type: string) => {
-    if (type === 'income') return '#36e27b';
-    return '#E5E7EB'; // Text secondary equivalent roughly
-  };
-
-  const getIconBg = (category: string, type: string) => {
-    if (type === 'income') return 'bg-primary/10 border-primary/30';
-    return 'bg-white/5 border-white/10';
-  };
+  // Unused functions removed: getIconColor, getIconBg
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
