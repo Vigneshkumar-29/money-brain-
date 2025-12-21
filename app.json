@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.moneybrain.app"
+      "bundleIdentifier": "com.moneybrain.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -45,7 +48,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "36e034ce-d6b9-4d12-8e12-3697ef3730ab"
+        "projectId": "30f9f60e-092a-488b-8dd9-b55c27fa1d76"
       }
     }
   }
