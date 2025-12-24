@@ -14,8 +14,8 @@ import { rfs, rs, getIconSize, MIN_TOUCH_TARGET } from '../../lib/responsive';
 import Animated, {
   useAnimatedStyle,
   interpolate,
-  useAnimatedReaction,
   useSharedValue,
+  useDerivedValue,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
@@ -54,17 +54,6 @@ const TabIcon = ({
       transform: [{ scale }, { translateY }],
       opacity,
     };
-  });
-
-  // Interpolate color based on progress
-  const textStyle = useAnimatedStyle(() => {
-    // We'll use opacity to blend between colors visually
-    return {};
-  });
-
-  // Calculate color based on progress for the icon
-  const iconColor = useAnimatedStyle(() => {
-    return {};
   });
 
   return (
@@ -150,23 +139,15 @@ const TabItem = ({
   const label = options.title !== undefined ? options.title : route.name;
   const isFocused = state.index === index;
 
-  // Create a derived progress value based on position
+  // Create a derived progress value based on position for real-time smooth animation
   // Progress is 1 when position equals this tab's index, 0 when far away
-  const progress = useSharedValue(isFocused ? 1 : 0);
-
-  // React to position changes in real-time
-  useAnimatedReaction(
-    () => position.value,
-    (currentPosition) => {
-      // Calculate how "focused" this tab is based on position
-      // When currentPosition === index, progress = 1
-      // When |currentPosition - index| >= 1, progress = 0
-      const distance = Math.abs(currentPosition - index);
-      const newProgress = Math.max(0, 1 - distance);
-      progress.value = newProgress;
-    },
-    [index]
-  );
+  const progress = useDerivedValue(() => {
+    // Calculate how "focused" this tab is based on position
+    // When currentPosition === index, progress = 1
+    // When |currentPosition - index| >= 1, progress = 0
+    const distance = Math.abs(position.value - index);
+    return Math.max(0, 1 - distance);
+  }, [index]);
 
   const onPress = () => {
     const event = navigation.emit({
