@@ -1,5 +1,5 @@
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ArrowRight, Mail, Lock, AlertCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 
 export default function LoginScreen() {
-    // const router = useRouter(); // Unused
+    const router = useRouter();
     const { signIn } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -33,19 +33,31 @@ export default function LoginScreen() {
 
         setLoading(true);
 
-        const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 15000)
-        );
+        const { withTimeout } = require('../../utils');
 
         try {
-            await Promise.race([signIn(email, password), timeout]);
-            // If we're here, sign in was successful. 
-            // The AuthContext will handle navigation based on auth state changes.
-            // We keep loading true to prevent user interaction while redirecting.
+            // Attempt sign in with timeout
+            await withTimeout(
+                signIn(email, password),
+                15000,
+                'Login timed out. Please check your connection.'
+            );
+
+            // If successful, wait a bit for AuthContext to detect change
+            // If it doesn't redirect quickly, we manually redirect.
+            if (mounted.current) {
+                setTimeout(() => {
+                    if (mounted.current) {
+                        // Check if we are still on this screen. 
+                        // If so, force redirect to tabs
+                        router.replace('/(tabs)');
+                    }
+                }, 500);
+            }
         } catch (error: any) {
             if (mounted.current) {
                 // If it's a specific auth error, display it nicely
-                if (error.message.includes('Invalid login credentials')) {
+                if (error.message && error.message.includes('Invalid login credentials')) {
                     setErrorMsg('Invalid email or password. Please try again.');
                 } else {
                     setErrorMsg(error.message || 'An unexpected error occurred.');

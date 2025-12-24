@@ -66,6 +66,7 @@
     "@babel/core": "^7.25.2",
     "@types/jest": "^29.5.12",
     "@types/react": "~19.1.10",
+    "@types/react-native": "^0.72.8",
     "@types/react-test-renderer": "^18.3.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~10.0.0",

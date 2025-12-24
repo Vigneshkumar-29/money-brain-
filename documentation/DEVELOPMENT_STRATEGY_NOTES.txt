@@ -1,0 +1,42 @@
+DEVELOPMENT STRATEGY NOTES & Q/A SUMMARY
+
+1. OFFLINE FUNCTIONALITY (Offline-First Architecture)
+-----------------------------------------------------
+Q: Can the app work without an internet connection and sync later?
+A: Yes.
+   - Strategy: Use a local database (SQLite/WatermelonDB) on the device.
+   - Workflow:
+     1. User adds data -> Saved immediately to Local DB (works offline).
+     2. App maintains a "Sync Queue" of pending changes.
+     3. Background Service listens for internet.
+     4. When online -> Pushes queue to Supabase Backend.
+   - Tools: PowerSync or RxDB are recommended for easier Supabase offline syncing.
+
+2. SUPABASE COSTS & ALTERNATIVES
+-----------------------------------------------------
+Q: Can we cut Supabase subscription costs or use Excel?
+A: 
+   option A: Supabase Free Tier (Recommended)
+     - You do NOT need to pay. The free tier is valid for up to 50,000 monthly users and 500MB database size, which is sufficient for a personal finance app.
+   
+   Option B: Google Sheets as Backend
+     - Possible via Google Sheets API.
+     - Pros: User owns the data in their Drive. Readable file format.
+     - Cons: Slower performance, complex query logic, security management is harder.
+
+3. UPI PAYMENT INTEGRATION
+-----------------------------------------------------
+Q: Can users scan QR codes and pay via GPay/Paytm, and auto-save the transaction?
+A: Yes, with limitations.
+   - Mechanism:
+     1. App scans UPI QR Code (extracts string `upi://pay?...`).
+     2. App uses React Native `Linking.openURL()` to deep-link to GPay/Paytm.
+     3. User completes payment in the external app.
+   
+   - The "Callback" Limitation:
+     - GPay/Paytm do NOT send a success signal back to personal apps (only to registered merchants).
+     - Your app won't know automatically if the payment succeeded.
+   
+   - Solution:
+     - After redirecting user to GPay, show a dialogue: "Did you complete the payment?"
+     - User clicks "Yes" -> App saves the transaction (e.g., "Milk - $20") to the database.

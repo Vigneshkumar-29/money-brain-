@@ -189,13 +189,24 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         date: date.toISOString(),
       } as any;
 
+      // Import safely to avoid circular dependencies if any, though standard import is fine
+      const { withTimeout } = require('../../utils');
+
       if (initialTransaction) {
         console.log('Updating transaction:', initialTransaction.id);
-        await updateTransaction(initialTransaction.id, transactionData);
+        await withTimeout(
+          updateTransaction(initialTransaction.id, transactionData),
+          15000,
+          'Update timed out. Please check your internet connection.'
+        );
         console.log('Update successful');
       } else {
         console.log('Adding new transaction');
-        await addTransaction(transactionData);
+        await withTimeout(
+          addTransaction(transactionData),
+          15000,
+          'Transaction save timed out. Please check your internet connection.'
+        );
         console.log('Add successful');
       }
 

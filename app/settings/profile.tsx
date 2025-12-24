@@ -58,20 +58,32 @@ export default function ProfileSettings() {
                 updated_at: new Date().toISOString(),
             };
 
-            const { error } = await supabase.from('profiles').upsert(updates);
+            const { withTimeout } = require('../../utils');
+
+            // Wrap the specific supabase call
+            const updatePromise = supabase.from('profiles').upsert(updates);
+
+            const { error } = await withTimeout(
+                updatePromise,
+                10000,
+                'Profile update timed out. Please check your connection.'
+            );
 
             if (error) {
                 throw error;
             }
 
             // Refresh profile in AuthContext
-            await refreshProfile();
+            await withTimeout(refreshProfile(), 5000, 'Profile refreshed failed, but data saved.');
 
             Alert.alert('Success', 'Profile updated successfully!');
             router.back();
-        } catch (error) {
+        } catch (error: any) {
+            console.error('Update failed:', error);
             if (error instanceof Error) {
                 Alert.alert('Error', error.message);
+            } else {
+                Alert.alert('Error', 'An unexpected error occurred during profile update.');
             }
         } finally {
             setLoading(false);

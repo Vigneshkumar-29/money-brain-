@@ -1,0 +1,49 @@
+PROPOSED FEATURES FOR MONEYBRAIN - SOLVING REAL USER PAIN POINTS
+
+The current project, MoneyBrain, is a solid foundation for a personal finance tracker with a beautiful UI (glassmorphism, gradients) and essential functionality. To transform this into a solution that solves real user pain points and provides genuine value, the following professional features are recommended:
+
+1. Smart Budgeting & Forecasting (Solves: Overspending)
+   Users often don't know they are overspending until it's too late.
+   - Categories Budgets: Allow users to set monthly limits for specific categories (e.g., "Food", "Transport").
+   - Proactive Alerts: Send push notifications when a user hits 50%, 80%, or 100% of their budget *before* the month ends.
+   - "Safe to Spend" Indicator: Instead of just showing the total balance, calculate a "Safe to Spend" amount by subtracting upcoming fixed bills (rent, subscriptions) from the current balance.
+
+2. Subscription Management (Solves: "Vampire" Costs)
+   People often forget about recurring subscriptions that drain their accounts.
+   - Recurring Transaction Engine: Add a "Recurring" flag to transactions.
+   - Subscription Hub: A dedicated view to see all active subscriptions and their next billing dates.
+   - Renewal Reminders: Notify users 2 days before a yearly subscription renews so they can cancel if needed.
+
+3. Financial Goals & "Buckets" (Solves: Inability to Save)
+   Seeing a large bank balance often leads to impulsive spending because the money isn't "assigned" to a purpose.
+   - Goal Tracking: Allow users to create goals (e.g., "New Laptop", "Emergency Fund") with target amounts and dates.
+   - Virtual Buckets: Let users allocate portions of their main balance to these goals. The main dashboard should show "Available Balance" (Total - Goals) to prevent spending savings.
+
+4. Debt Payoff Planner (Solves: Debt Stress)
+   Debt is a major stressor. Visualizing the path to zero is highly motivating.
+   - Debt Snowball/Avalanche Tools: Users input their debts (credit cards, loans) and interest rates. The app calculates the best payoff strategy and constructs a timeline to becoming debt-free.
+
+5. Enhanced "Real" AI Insights (Solves: Financial Illiteracy)
+   The current "AI Insights" are hardcoded logic. Leveraging a real LLM (like Gemini or GPT) can provide personalized coaching.
+   - Spending Anomaly Detection: "You spent 30% more on dining out this week compared to your 3-month average."
+   - Opportunity Scans: "If you cut your 'Entertainment' budget by 10%, you could hit your 'Car' goal 2 months earlier."
+   - Natural Language Entry: Allow users to text the app: "Spent 500 on lunch" and have the AI parse and categorize it automatically.
+
+6. Multi-User / Shared Wallets (Solves: Shared Expenses)
+   Finances are often shared between couples or roommates.
+   - Split Bills: A feature to split a specific transaction with another user.
+   - Household Mode: A shared view where couples can track joint expenses (Rent, Utilities) while keeping personal spending private.
+
+7. Export & Tax Readiness (Solves: Administrative Burden)
+   - Accountant-Ready Reports: Functional PDF/CSV exports that group expenses by tax-deductible categories.
+   - Receipt Scanning: Allow attaching photos to transactions for warranty or tax proof.
+
+SUMMARY OF PRIORITIES
+---------------------
+| Feature                  | Difficulty | Impact |
+| ------------------------ | ---------- | ------ |
+| Budgeting Limits         | Medium     | High   |
+| Recurring/Subscriptions  | Medium     | High   |
+| Goal Tracking            | Low        | Medium |
+| Receipt Attachments      | Low        | Medium |
+| Natural Language Entry   | High       | High   |
