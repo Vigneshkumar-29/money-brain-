@@ -1,7 +1,7 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Keyboard, Platform } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowRight, Mail, Lock, User, ShieldCheck, AlertCircle } from 'lucide-react-native';
+import { ArrowRight, Mail, Lock, User, ShieldCheck, AlertCircle, Eye, EyeOff } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
@@ -13,14 +13,34 @@ export default function SignUpScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const mounted = useRef(true);
+    const scrollViewRef = useRef<ScrollView>(null);
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
 
     useEffect(() => {
         mounted.current = true;
+
+        const keyboardDidShowListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => {
+                setKeyboardVisible(true);
+            }
+        );
+        const keyboardDidHideListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                setKeyboardVisible(false);
+            }
+        );
+
         return () => {
             mounted.current = false;
+            keyboardDidShowListener.remove();
+            keyboardDidHideListener.remove();
         };
     }, []);
 
@@ -71,7 +91,17 @@ export default function SignUpScreen() {
             <StatusBar style="light" />
 
             <SafeAreaView className="flex-1">
-                <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
+                <ScrollView
+                    ref={scrollViewRef}
+                    contentContainerStyle={{
+                        flexGrow: 1,
+                        justifyContent: keyboardVisible ? 'flex-start' : 'center',
+                        padding: 24,
+                        paddingBottom: keyboardVisible ? 150 : 24
+                    }}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <View className="items-center mb-10">
                         <View className="w-16 h-16 bg-primary/20 rounded-2xl items-center justify-center mb-4 border border-primary/30">
                             <User size={32} color="#2ECC71" />
@@ -102,6 +132,7 @@ export default function SignUpScreen() {
                                         if (errorMsg) setErrorMsg(null);
                                     }}
                                     editable={!loading}
+                                    returnKeyType="next"
                                 />
                             </View>
                         </View>
@@ -122,6 +153,7 @@ export default function SignUpScreen() {
                                         if (errorMsg) setErrorMsg(null);
                                     }}
                                     editable={!loading}
+                                    returnKeyType="next"
                                 />
                             </View>
                         </View>
@@ -134,14 +166,27 @@ export default function SignUpScreen() {
                                     className="flex-1 ml-3 text-text-dark font-body text-base"
                                     placeholder="••••••••"
                                     placeholderTextColor="#4B5563"
-                                    secureTextEntry
+                                    secureTextEntry={!showPassword}
                                     value={password}
                                     onChangeText={(text) => {
                                         setPassword(text);
                                         if (errorMsg) setErrorMsg(null);
                                     }}
                                     editable={!loading}
+                                    returnKeyType="next"
                                 />
+                                <TouchableOpacity
+                                    onPress={() => setShowPassword(!showPassword)}
+                                    disabled={loading}
+                                    className="ml-2 p-1"
+                                    activeOpacity={0.7}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff size={20} color="#6B7280" />
+                                    ) : (
+                                        <Eye size={20} color="#6B7280" />
+                                    )}
+                                </TouchableOpacity>
                             </View>
                         </View>
 
@@ -153,14 +198,28 @@ export default function SignUpScreen() {
                                     className="flex-1 ml-3 text-text-dark font-body text-base"
                                     placeholder="••••••••"
                                     placeholderTextColor="#4B5563"
-                                    secureTextEntry
+                                    secureTextEntry={!showConfirmPassword}
                                     value={confirmPassword}
                                     onChangeText={(text) => {
                                         setConfirmPassword(text);
                                         if (errorMsg) setErrorMsg(null);
                                     }}
                                     editable={!loading}
+                                    returnKeyType="done"
+                                    onSubmitEditing={handleSignUp}
                                 />
+                                <TouchableOpacity
+                                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    disabled={loading}
+                                    className="ml-2 p-1"
+                                    activeOpacity={0.7}
+                                >
+                                    {showConfirmPassword ? (
+                                        <EyeOff size={20} color="#6B7280" />
+                                    ) : (
+                                        <Eye size={20} color="#6B7280" />
+                                    )}
+                                </TouchableOpacity>
                             </View>
                         </View>
 
