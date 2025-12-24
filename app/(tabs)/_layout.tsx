@@ -16,8 +16,6 @@ import Animated, {
   interpolate,
   useSharedValue,
   useDerivedValue,
-  withTiming,
-  Easing,
 } from 'react-native-reanimated';
 
 // 1. Create the navigator instance
@@ -202,18 +200,16 @@ function CustomTabBar({ state, descriptors, navigation, position }: any) {
   React.useEffect(() => {
     if (position) {
       const listener = position.addListener(({ value }: { value: number }) => {
+        // Direct assignment for instant update - no animation delay
         animatedPosition.value = value;
       });
       return () => position.removeListener(listener);
     }
   }, [position]);
 
-  // Also update when state.index changes (for tap navigation)
+  // Also update when state.index changes (for tap navigation) - instant update
   React.useEffect(() => {
-    animatedPosition.value = withTiming(state.index, {
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
-    });
+    animatedPosition.value = state.index;
   }, [state.index]);
 
   return (
