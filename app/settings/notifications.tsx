@@ -6,19 +6,12 @@ import { ArrowLeft, Bell, BellRing, Clock, AlertTriangle } from 'lucide-react-na
 import FadeInView from '../../components/ui/FadeInView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { scheduleDailyReminder, cancelDailyReminder, requestPermissions } from '../../utils/notifications';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.appOwnership === 'expo';
 
-// Dynamically import notifications only when not in Expo Go
-let Notifications: typeof import('expo-notifications') | null = null;
-if (!isExpoGo) {
-    try {
-        Notifications = require('expo-notifications');
-    } catch {
-        console.log('expo-notifications not available');
-    }
-}
+
 
 export default function NotificationSettings() {
     const router = useRouter();
@@ -29,16 +22,15 @@ export default function NotificationSettings() {
     const notificationsAvailable = !isExpoGo;
 
     useEffect(() => {
-        if (notificationsAvailable && Notifications) {
+        if (notificationsAvailable) {
             checkPermissions();
         }
         loadPreferences();
     }, [notificationsAvailable]);
 
     async function checkPermissions() {
-        if (!Notifications) return;
-        const { status } = await Notifications.getPermissionsAsync();
-        setEnabled(status === 'granted');
+        const granted = await requestPermissions();
+        setEnabled(granted);
     }
 
     async function loadPreferences() {
@@ -55,32 +47,35 @@ export default function NotificationSettings() {
     async function savePreferences(key: string, value: boolean) {
         try {
             const current = { dailyReminder, budgetAlerts, [key]: value };
+
+            // Handle side effects for Daily Reminder
+            if (key === 'dailyReminder') {
+                if (value) {
+                    await scheduleDailyReminder();
+                } else {
+                    await cancelDailyReminder();
+                }
+            }
+
             await AsyncStorage.setItem('notification_prefs', JSON.stringify(current));
         } catch { }
     }
 
     async function toggleNotifications(value: boolean) {
-        if (!notificationsAvailable || !Notifications) {
-            Alert.alert(
-                'Not Available',
-                'Push notifications are not available in Expo Go. Please use a development build to enable this feature.',
-                [{ text: 'OK' }]
-            );
-            return;
-        }
+        // Allow trying even in Expo Go for local notifications,
+        // but keep the check if we want to be strict about push.
+        // For now, let's just use requestPermissions which handles local.
 
         if (value) {
-            const { status } = await Notifications.requestPermissionsAsync();
-            setEnabled(status === 'granted');
-            if (status !== 'granted') {
+            const granted = await requestPermissions();
+            setEnabled(granted);
+            if (!granted) {
                 Alert.alert('Permission Required', 'Please enable notifications in your system settings.');
                 return;
             }
         } else {
             // We can't actually disable system permissions programmatically, just our local "toggle" state visually
-            // In a real app, user goes to settings.
             Alert.alert('System Settings', 'To disable notifications, please go to your device settings.');
-            // We keep it true if system is true, effectively.
         }
     }
 

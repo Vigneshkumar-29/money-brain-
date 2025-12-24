@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import * as api from '../lib/api/transactions';
 import { Transaction } from '../lib/types';
+import { checkBudgetExceeded } from '../utils/notifications';
 export { ICON_MAP, getCategoryIconName } from '../lib/constants';
 export type { Transaction };
 
@@ -134,6 +135,11 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
         try {
 
             await api.addTransactionApi(user.id, newTransaction);
+
+            // Check budget alert immediately after adding
+            const stats = await api.fetchBalanceStatsApi(user.id);
+            checkBudgetExceeded(stats.income, stats.expense);
+
             // Reset main list and refresh globals
             await fetchTransactions(true, { search: '', type: 'All' });
             setFilters({ search: '', type: 'All' });
