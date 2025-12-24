@@ -25,6 +25,13 @@ export const MaterialTopTabs = withLayoutContext<
 >(Navigator);
 
 // Animated Tab Icon Component for that "Professional" feel
+// Optimized spring config for snappy animations
+const SPRING_CONFIG = {
+  damping: 15,
+  stiffness: 300,
+  mass: 0.5,
+};
+
 const TabIcon = ({
   isFocused,
   Icon,
@@ -37,7 +44,9 @@ const TabIcon = ({
   color: string;
 }) => {
   const progress = useDerivedValue(() => {
-    return isFocused ? withSpring(1) : withTiming(0);
+    return isFocused
+      ? withSpring(1, SPRING_CONFIG)
+      : withTiming(0, { duration: 150 });
   }, [isFocused]);
 
   const animatedStyle = useAnimatedStyle(() => {
