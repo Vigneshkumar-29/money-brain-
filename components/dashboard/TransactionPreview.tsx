@@ -4,20 +4,15 @@ import TransactionItem from '../transactions/TransactionItem';
 import { ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTransactions } from '../../context/TransactionContext';
+import { usePreferences } from '../../context/PreferencesContext';
 
 export default function TransactionPreview() {
   const router = useRouter();
   const { transactions } = useTransactions();
+  const { formatCurrency } = usePreferences();
 
   // Get recent 5 transactions
   const recentTransactions = transactions.slice(0, 5);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount);
-  };
 
   return (
     <View className="bg-card-light dark:bg-card-dark p-5 rounded-2xl shadow-md border border-gray-100 dark:border-gray-800 mt-2">

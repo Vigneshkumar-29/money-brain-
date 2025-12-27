@@ -1,31 +1,13 @@
 import { View, Text, TextInput, ScrollView, Platform, ActivityIndicator, Modal, Pressable, StyleSheet, TouchableWithoutFeedback } from 'react-native';
 import React, { useState, useMemo } from 'react';
 import { useTransactions, Transaction } from '../../context/TransactionContext';
+import { usePreferences } from '../../context/PreferencesContext';
+import { getIconComponent } from '../../lib/preferences';
 import {
   X,
-  Utensils,
-  ShoppingBag,
-  Car,
-  Zap,
-  Heart,
   CheckCircle,
   Delete,
-  ArrowUp,
-  ArrowDown,
   ArrowLeft,
-  Home,
-  Smartphone,
-  Coffee,
-  Gift,
-  Plane,
-  Film,
-  Dumbbell,
-  GraduationCap,
-  Briefcase,
-  TrendingUp,
-  DollarSign,
-  Users,
-  HandCoins
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -58,45 +40,6 @@ const TypeButton: React.FC<{
   );
 };
 
-// Comprehensive category configurations for each transaction type
-const EXPENSE_CATEGORIES = [
-  { id: 'food', label: 'Food & Dining', icon: Utensils },
-  { id: 'shopping', label: 'Shopping', icon: ShoppingBag },
-  { id: 'transport', label: 'Transport', icon: Car },
-  { id: 'bills', label: 'Bills & Utilities', icon: Zap },
-  { id: 'health', label: 'Healthcare', icon: Heart },
-  { id: 'home', label: 'Home & Rent', icon: Home },
-  { id: 'entertainment', label: 'Entertainment', icon: Film },
-  { id: 'education', label: 'Education', icon: GraduationCap },
-  { id: 'fitness', label: 'Fitness', icon: Dumbbell },
-  { id: 'travel', label: 'Travel', icon: Plane },
-  { id: 'gifts', label: 'Gifts', icon: Gift },
-  { id: 'phone', label: 'Phone & Internet', icon: Smartphone },
-];
-
-const INCOME_CATEGORIES = [
-  { id: 'salary', label: 'Salary', icon: Briefcase },
-  { id: 'freelance', label: 'Freelance', icon: Coffee },
-  { id: 'business', label: 'Business', icon: TrendingUp },
-  { id: 'investment', label: 'Investment', icon: DollarSign },
-  { id: 'bonus', label: 'Bonus', icon: Gift },
-  { id: 'refund', label: 'Refund', icon: ArrowDown },
-  { id: 'other_income', label: 'Other Income', icon: DollarSign },
-];
-
-const LENT_CATEGORIES = [
-  { id: 'lent_friend', label: 'Lent to Friend', icon: Users },
-  { id: 'lent_family', label: 'Lent to Family', icon: Heart },
-  { id: 'lent_other', label: 'Lent to Other', icon: HandCoins },
-];
-
-const BORROWED_CATEGORIES = [
-  { id: 'borrowed_friend', label: 'Borrowed from Friend', icon: Users },
-  { id: 'borrowed_family', label: 'Borrowed from Family', icon: Heart },
-  { id: 'borrowed_bank', label: 'Bank Loan', icon: Briefcase },
-  { id: 'borrowed_other', label: 'Borrowed from Other', icon: HandCoins },
-];
-
 interface TransactionFormProps {
   onClose?: () => void;
   initialTransaction?: Transaction;
@@ -108,6 +51,14 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
   );
 
   const { addTransaction, updateTransaction } = useTransactions();
+  const {
+    expenseCategories,
+    incomeCategories,
+    lentCategories,
+    borrowedCategories,
+    currencySymbol
+  } = usePreferences();
+
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState(initialTransaction?.amount.toString() || '');
   const [selectedCategory, setSelectedCategory] = useState(initialTransaction?.category || 'food');
@@ -116,19 +67,19 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
 
   const insets = useSafeAreaInsets();
 
-  // Get categories based on selected type
+  // Get categories based on selected type - now from preferences context
   const currentCategories = useMemo(() => {
     switch (type) {
       case 'income':
-        return INCOME_CATEGORIES;
+        return incomeCategories;
       case 'lent':
-        return LENT_CATEGORIES;
+        return lentCategories;
       case 'borrowed':
-        return BORROWED_CATEGORIES;
+        return borrowedCategories;
       default:
-        return EXPENSE_CATEGORIES;
+        return expenseCategories;
     }
-  }, [type]);
+  }, [type, expenseCategories, incomeCategories, lentCategories, borrowedCategories]);
 
   // Update selected category when type changes
   const handleTypeChange = (newType: 'expense' | 'income' | 'lent' | 'borrowed') => {
@@ -252,7 +203,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         <View className="items-center justify-center py-8">
           <View className="flex-row items-center justify-center relative">
             <Text className="text-gray-800 dark:text-white text-[3.5rem] leading-none font-bold tracking-tight font-display">
-              ₹{amount || '0'}
+              {currencySymbol}{amount || '0'}
             </Text>
             <View className="h-10 w-1 bg-primary ml-1 rounded-full" />
           </View>
@@ -294,7 +245,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row -mx-6 px-6 pb-2">
             {currentCategories.slice(0, 6).map((cat) => {
-              const Icon = cat.icon;
+              const Icon = getIconComponent(cat.icon);
               const isSelected = selectedCategory === cat.id;
               return (
                 <Pressable
@@ -393,7 +344,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
             <ScrollView className="px-6 py-4" showsVerticalScrollIndicator={false}>
               <View className="flex-row flex-wrap gap-3 pb-6">
                 {currentCategories.map((cat) => {
-                  const Icon = cat.icon;
+                  const Icon = getIconComponent(cat.icon);
                   const isSelected = selectedCategory === cat.id;
                   return (
                     <Pressable
@@ -405,10 +356,15 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
                       className="w-[48%]"
                     >
                       <View className={`p-4 rounded-2xl border ${isSelected ? 'bg-primary border-primary' : 'bg-white/5 border-white/10'}`}>
-                        <Icon size={24} color={isSelected ? '#112117' : '#36e27b'} />
+                        <Icon size={24} color={isSelected ? '#112117' : cat.color || '#36e27b'} />
                         <Text className={`text-sm font-medium mt-2 ${isSelected ? 'text-[#112117]' : 'text-white'}`}>
                           {cat.label}
                         </Text>
+                        {cat.isCustom && (
+                          <View className="absolute top-2 right-2 bg-primary/30 px-1.5 py-0.5 rounded">
+                            <Text className="text-[8px] text-primary font-bold">CUSTOM</Text>
+                          </View>
+                        )}
                       </View>
                     </Pressable>
                   );

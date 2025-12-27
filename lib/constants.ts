@@ -1,21 +1,15 @@
-import { ShoppingBag, Coffee, ArrowUpRight, Home, Car, Smartphone, Utensils, Zap, Tag, DollarSign } from 'lucide-react-native';
+/**
+ * @deprecated Use lib/preferences.ts instead for category configuration.
+ * This file is kept for backward compatibility.
+ */
 
-// Map icon string names to Lucide components for rendering
-export const ICON_MAP: any = {
-    ShoppingBag, Coffee, ArrowUpRight, Home, Car, Smartphone, Utensils, Zap, Tag, DollarSign
-};
+import { CATEGORY_ICONS, getCategoryIconName as getIconName, getIconComponent } from './preferences';
 
-// Helper to map category to icon name (simplified)
-export const getCategoryIconName = (category: string) => {
-    switch (category.toLowerCase()) {
-        case 'food': return 'Utensils';
-        case 'shopping': return 'ShoppingBag';
-        case 'transport': return 'Car';
-        case 'home': return 'Home';
-        case 'utilities': return 'Zap';
-        case 'salary': return 'DollarSign';
-        case 'freelance': return 'Coffee';
-        case 'investment': return 'Tag';
-        default: return 'DollarSign';
-    }
-};
+// Re-export for backward compatibility
+export const ICON_MAP = CATEGORY_ICONS;
+
+// Wrapper for backward compatibility
+export const getCategoryIconName = getIconName;
+
+// Export the new icon component getter
+export { getIconComponent };

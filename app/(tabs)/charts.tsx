@@ -1,15 +1,20 @@
-import { View, Text, ScrollView, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, Platform, Alert, ActivityIndicator } from 'react-native';
 // import { SafeAreaView } from 'react-native-safe-area-context'; // Unused
 import React, { useState, useMemo } from 'react';
 import { useTransactions } from '../../context/TransactionContext';
 import { useAuth } from '../../context/AuthContext';
+import { usePreferences } from '../../context/PreferencesContext';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { exportToPDF, exportToCSV } from '../../utils/exportData';
+import { generateInsights, Insight } from '../../utils/aiInsights';
+import { InteractiveBarChart, InteractiveCategoryChart } from '../../components/charts/InteractiveCharts';
 import {
   Bell,
   Wallet,
   TrendingUp,
+  TrendingDown,
   MoreHorizontal,
   Zap,
   AlertTriangle,
@@ -17,7 +22,13 @@ import {
   FileText,
   TableProperties,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  Loader2,
+  Lightbulb,
+  Calendar,
+  Target,
+  DollarSign,
+  BarChart3
 } from 'lucide-react-native';
 
 const GlassPanel = ({ children, className = "", style = {} }: { children: React.ReactNode, className?: string, style?: any }) => (
@@ -49,6 +60,7 @@ const GlassPanelHighlight = ({ children, className = "", style = {} }: { childre
 export default function AnalyticsScreen() {
   const { transactions } = useTransactions(); // totals unused
   const { profile, user } = useAuth();
+  const { formatCurrency, getCategoryById } = usePreferences();
 
   // Get current month as default
   const currentDate = new Date();
@@ -57,6 +69,8 @@ export default function AnalyticsScreen() {
 
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(currentMonthIndex);
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   // Generate available months from transaction data
   const availableMonths = useMemo(() => {
@@ -133,15 +147,6 @@ export default function AnalyticsScreen() {
   // Get avatar URL or generate one
   const avatarUrl = profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=36e27b&color=fff&size=128`;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   // Calculate percentages for "Spending Mix" - using filtered transactions
   const categoryData = useMemo(() => {
     const expenses = filteredTransactions.filter(tx => tx.type === 'expense');
@@ -153,15 +158,18 @@ export default function AnalyticsScreen() {
     });
 
     return Object.entries(categoryTotals)
-      .map(([category, amount]) => ({
-        label: category.charAt(0).toUpperCase() + category.slice(1),
-        value: amount,
-        percentage: totalExp > 0 ? (amount / totalExp) * 100 : 0,
-        color: getColorForCategory(category)
-      }))
+      .map(([category, amount]) => {
+        const categoryInfo = getCategoryById(category);
+        return {
+          label: categoryInfo?.label || category.charAt(0).toUpperCase() + category.slice(1),
+          value: amount,
+          percentage: totalExp > 0 ? (amount / totalExp) * 100 : 0,
+          color: categoryInfo?.color || '#9CA3AF'
+        };
+      })
       .sort((a, b) => b.value - a.value)
       .slice(0, 4);
-  }, [filteredTransactions]);
+  }, [filteredTransactions, getCategoryById]);
 
   // Calculate weekly data for the selected month
   const weeklyData = useMemo(() => {
@@ -192,12 +200,87 @@ export default function AnalyticsScreen() {
     m => m.monthIndex === selectedMonthIndex && m.year === selectedYear
   )?.label || new Date(selectedYear, selectedMonthIndex).toLocaleString('en-US', { month: 'long' });
 
-  function getColorForCategory(cat: string) {
-    if (cat.toLowerCase().includes('food')) return '#A78BFA'; // Purple-400
-    if (cat.toLowerCase().includes('shopping')) return '#36e27b'; // Primary
-    if (cat.toLowerCase().includes('transport')) return '#60A5FA'; // Blue-400
-    return '#9CA3AF'; // Gray-500
-  }
+  // AI-powered insights analysis
+  const aiAnalysis = useMemo(() => {
+    return generateInsights(
+      filteredTransactions,
+      transactions,
+      selectedMonthIndex,
+      selectedYear,
+      monthlyTotals
+    );
+  }, [filteredTransactions, transactions, selectedMonthIndex, selectedYear, monthlyTotals]);
+
+  // Helper function to get icon for insight type
+  const getInsightIcon = (iconType: string, color: string) => {
+    const iconProps = { size: 20, color, style: { marginTop: 2 } };
+    switch (iconType) {
+      case 'trophy': return <Trophy {...iconProps} />;
+      case 'alert': return <AlertTriangle {...iconProps} />;
+      case 'trending': return <TrendingUp {...iconProps} />;
+      case 'lightbulb': return <Lightbulb {...iconProps} />;
+      case 'calendar': return <Calendar {...iconProps} />;
+      case 'target': return <Target {...iconProps} />;
+      case 'money': return <DollarSign {...iconProps} />;
+      case 'chart': return <BarChart3 {...iconProps} />;
+      default: return <Zap {...iconProps} />;
+    }
+  };
+
+  // Get color for insight type
+  const getInsightColor = (type: string) => {
+    switch (type) {
+      case 'success': return { border: 'border-l-primary', gradient: 'rgba(54,226,123,0.1)', text: 'text-green-100', icon: '#36e27b' };
+      case 'warning': return { border: 'border-l-orange-500', gradient: 'rgba(249,115,22,0.1)', text: 'text-orange-100', icon: '#F97316' };
+      case 'tip': return { border: 'border-l-blue-500', gradient: 'rgba(59,130,246,0.1)', text: 'text-blue-100', icon: '#3B82F6' };
+      case 'info':
+      default: return { border: 'border-l-purple-500', gradient: 'rgba(168,85,247,0.1)', text: 'text-purple-100', icon: '#A855F7' };
+    }
+  };
+
+  // Export handlers
+  const handleExportPDF = async () => {
+    if (exportingPDF) return;
+
+    if (filteredTransactions.length === 0) {
+      Alert.alert('No Data', `No transactions found for ${selectedMonthName} ${selectedYear} to export.`);
+      return;
+    }
+
+    setExportingPDF(true);
+    try {
+      await exportToPDF(
+        filteredTransactions,
+        selectedMonthName,
+        selectedYear,
+        monthlyTotals,
+        username
+      );
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (exportingCSV) return;
+
+    if (filteredTransactions.length === 0) {
+      Alert.alert('No Data', `No transactions found for ${selectedMonthName} ${selectedYear} to export.`);
+      return;
+    }
+
+    setExportingCSV(true);
+    try {
+      await exportToCSV(
+        filteredTransactions,
+        selectedMonthName,
+        selectedYear,
+        monthlyTotals
+      );
+    } finally {
+      setExportingCSV(false);
+    }
+  };
 
   return (
     <View className="flex-1 bg-background-light dark:bg-background-dark">
@@ -367,138 +450,131 @@ export default function AnalyticsScreen() {
               </View>
             </View>
 
-            {/* Weekly Bar Chart with Real Data */}
-            <View className="flex-row justify-between h-[160px] items-end px-2">
-              {weeklyData.map((week, index) => {
-                const maxAmount = Math.max(
-                  ...weeklyData.map(w => Math.max(w.income, w.expense)),
-                  1
-                );
-                const expenseHeight = (week.expense / maxAmount) * 100;
-                const incomeHeight = (week.income / maxAmount) * 100;
-                const hasData = week.income > 0 || week.expense > 0;
+            {/* Interactive Weekly Bar Chart */}
+            <InteractiveBarChart
+              data={weeklyData.map((week, index) => ({
+                label: `Wk ${index + 1}`,
+                income: week.income,
+                expense: week.expense,
+              }))}
+              height={180}
+              formatCurrency={formatCurrency}
+            />
 
-                return (
-                  <View key={index} className="flex-col items-center gap-2 h-full justify-end flex-1 mx-1">
-                    <View className="relative w-full flex-row justify-center gap-1 h-full items-end">
-                      <View
-                        className="w-2.5 bg-white/20 rounded-t-sm"
-                        style={{ height: hasData ? `${Math.max(expenseHeight, 5)}%` : '5%' }}
-                      />
-                      <View
-                        className="w-2.5 bg-primary rounded-t-sm shadow-[0_0_12px_rgba(54,226,123,0.4)]"
-                        style={{ height: hasData ? `${Math.max(incomeHeight, 5)}%` : '5%' }}
-                      />
-                    </View>
-                    <Text className="text-gray-500 text-[10px] font-bold uppercase font-display">Wk {index + 1}</Text>
-                  </View>
-                );
-              })}
-            </View>
+            <Text className="text-gray-500 text-xs text-center mt-4 font-display">
+              Tap on bars to see week details
+            </Text>
           </GlassPanel>
         </View>
 
         {/* Spending Mix Chart */}
         <View className="px-6 mb-6">
           <GlassPanel className="p-6">
-            <View className="flex-row justify-between items-start mb-6">
+            <View className="flex-row justify-between items-start mb-4">
               <View>
                 <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1 font-display">Spending Mix</Text>
                 <Text className="text-white text-2xl font-bold font-display">
                   {formatCurrency(monthlyTotals.expense)} <Text className="text-gray-400 font-normal text-lg">Out</Text>
                 </Text>
               </View>
-              <Pressable className="w-8 h-8 items-center justify-center rounded-full bg-white/5">
-                <MoreHorizontal size={18} color="white" />
-              </Pressable>
+              <View className="bg-white/10 px-3 py-1.5 rounded-full">
+                <Text className="text-xs text-gray-300 font-display">
+                  {categoryData.length} Categories
+                </Text>
+              </View>
             </View>
 
-            <View className="gap-5">
-              {categoryData.length > 0 ? categoryData.map((item, index) => (
-                <View key={index} className="gap-2">
-                  <View className="flex-row justify-between">
-                    <View className="flex-row items-center gap-2">
-                      <View className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color, shadowColor: item.color, shadowOpacity: 0.6, shadowRadius: 8, elevation: 5 }} />
-                      <Text className="text-white font-medium text-sm font-display">{item.label}</Text>
-                    </View>
-                    <Text className="text-white font-bold text-sm font-mono">{formatCurrency(item.value)}</Text>
-                  </View>
-                  <View className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                    <View
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${item.percentage}%`,
-                        backgroundColor: item.color,
-                        shadowColor: item.color,
-                        shadowOpacity: 0.4,
-                      }}
-                    />
-                  </View>
-                </View>
-              )) : (
-                <Text className="text-gray-500 text-sm py-4 text-center font-display">No expenses yet</Text>
-              )}
-            </View>
+            {/* Interactive Category Chart */}
+            <InteractiveCategoryChart
+              data={categoryData}
+              formatCurrency={formatCurrency}
+              totalExpense={monthlyTotals.expense}
+            />
+
+            {categoryData.length > 0 && (
+              <Text className="text-gray-500 text-xs text-center mt-4 font-display">
+                Tap on categories to see details
+              </Text>
+            )}
           </GlassPanel>
         </View>
 
         {/* AI Insights */}
         <View className="px-6 mb-8">
-          <View className="flex-row items-center gap-2 mb-4">
-            <Zap size={20} color="#36e27b" />
-            <Text className="text-white text-lg font-bold font-display">AI Insights</Text>
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center gap-2">
+              <Zap size={20} color="#36e27b" />
+              <Text className="text-white text-lg font-bold font-display">AI Insights</Text>
+            </View>
+            {aiAnalysis.insights.length > 0 && (
+              <View className="flex-row items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full">
+                <Text className="text-xs text-gray-300">Health Score</Text>
+                <Text className={`text-sm font-bold ${aiAnalysis.healthScore >= 70 ? 'text-green-400' :
+                  aiAnalysis.healthScore >= 50 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                  {aiAnalysis.healthScore}
+                </Text>
+              </View>
+            )}
           </View>
+
           <View className="gap-3">
-            {categoryData.length > 0 && (
+            {/* Render dynamic AI insights */}
+            {aiAnalysis.insights.length > 0 ? (
               <>
-                {/* Top Category Insight */}
-                <GlassPanel className="p-4 flex-row items-start gap-3 border-l-4 border-l-primary relative overflow-hidden">
-                  <LinearGradient colors={['rgba(54,226,123,0.1)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 0 }} className="absolute inset-0" />
-                  <Trophy size={20} color="#36e27b" style={{ marginTop: 2 }} />
-                  <View className="flex-1">
-                    <Text className="text-green-100 text-sm leading-relaxed font-body">
-                      <Text className="text-white font-bold">Top Category: </Text>
-                      {categoryData[0]?.label || 'Shopping'} is your highest expense category at <Text className="text-white font-bold">{formatCurrency(categoryData[0]?.value || 0)}</Text> ({categoryData[0]?.percentage.toFixed(0)}% of total spending).
-                    </Text>
-                  </View>
-                </GlassPanel>
+                {aiAnalysis.insights.map((insight) => {
+                  const colors = getInsightColor(insight.type);
+                  return (
+                    <GlassPanel
+                      key={insight.id}
+                      className={`p-4 flex-row items-start gap-3 border-l-4 ${colors.border} relative overflow-hidden`}
+                    >
+                      <LinearGradient
+                        colors={[colors.gradient, 'transparent']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0.8, y: 0 }}
+                        className="absolute inset-0"
+                      />
+                      {getInsightIcon(insight.icon, colors.icon)}
+                      <View className="flex-1">
+                        <Text className={`${colors.text} text-sm leading-relaxed font-body`}>
+                          <Text className="text-white font-bold">{insight.title} </Text>
+                          {insight.message}
+                        </Text>
+                      </View>
+                    </GlassPanel>
+                  );
+                })}
 
-                {/* Spending Alert if applicable */}
-                {monthlyTotals.expense > monthlyTotals.income && monthlyTotals.expense > 0 && (
-                  <GlassPanel className="p-4 flex-row items-start gap-3 border-l-4 border-l-orange-500 relative overflow-hidden">
-                    <LinearGradient colors={['rgba(249,115,22,0.1)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 0 }} className="absolute inset-0" />
-                    <AlertTriangle size={20} color="#F97316" style={{ marginTop: 2 }} />
-                    <View className="flex-1">
-                      <Text className="text-orange-100 text-sm leading-relaxed font-body">
-                        <Text className="text-white font-bold">Alert: </Text>
-                        In {selectedMonthName}, your expenses ({formatCurrency(monthlyTotals.expense)}) exceeded your income ({formatCurrency(monthlyTotals.income)}). Consider reviewing your spending.
+                {/* Spending Trend Indicator */}
+                {aiAnalysis.spendingTrend !== 'stable' && (
+                  <GlassPanelHighlight className="p-4 flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-3">
+                      {aiAnalysis.spendingTrend === 'increasing' ? (
+                        <TrendingUp size={20} color="#F97316" />
+                      ) : (
+                        <TrendingDown size={20} color="#36e27b" />
+                      )}
+                      <Text className="text-white text-sm font-body">
+                        Spending Trend: <Text className="font-bold capitalize">{aiAnalysis.spendingTrend}</Text>
                       </Text>
                     </View>
-                  </GlassPanel>
-                )}
-
-                {/* Positive insight when income > expenses */}
-                {monthlyTotals.income > monthlyTotals.expense && monthlyTotals.income > 0 && (
-                  <GlassPanel className="p-4 flex-row items-start gap-3 border-l-4 border-l-primary relative overflow-hidden">
-                    <LinearGradient colors={['rgba(54,226,123,0.1)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 0 }} className="absolute inset-0" />
-                    <Trophy size={20} color="#36e27b" style={{ marginTop: 2 }} />
-                    <View className="flex-1">
-                      <Text className="text-green-100 text-sm leading-relaxed font-body">
-                        <Text className="text-white font-bold">Great Job! </Text>
-                        In {selectedMonthName}, you saved {formatCurrency(monthlyTotals.income - monthlyTotals.expense)}. Keep up the good work!
+                    <View className={`px-2 py-1 rounded-full ${aiAnalysis.spendingTrend === 'increasing' ? 'bg-orange-500/20' : 'bg-green-500/20'
+                      }`}>
+                      <Text className={`text-xs font-bold ${aiAnalysis.spendingTrend === 'increasing' ? 'text-orange-400' : 'text-green-400'
+                        }`}>
+                        {aiAnalysis.spendingTrend === 'increasing' ? '↑' : '↓'}
                       </Text>
                     </View>
-                  </GlassPanel>
+                  </GlassPanelHighlight>
                 )}
               </>
-            )}
-
-            {categoryData.length === 0 && (
+            ) : (
               <GlassPanel className="p-4 flex-row items-start gap-3">
                 <Zap size={20} color="#9CA3AF" style={{ marginTop: 2 }} />
                 <View className="flex-1">
                   <Text className="text-gray-400 text-sm leading-relaxed font-body">
-                    Add some transactions to see personalized insights about your spending patterns.
+                    Add some transactions to see personalized AI insights about your spending patterns, savings potential, and financial trends.
                   </Text>
                 </View>
               </GlassPanel>
@@ -508,13 +584,33 @@ export default function AnalyticsScreen() {
 
         {/* Export Actions */}
         <View className="px-6 mb-8 flex-row gap-4">
-          <Pressable className="flex-1 h-12 rounded-xl border border-white/10 bg-white/5 flex-row items-center justify-center gap-2 active:scale-95 transition-transform">
-            <FileText size={20} color="white" />
-            <Text className="text-white text-sm font-bold font-display">Export PDF</Text>
+          <Pressable
+            onPress={handleExportPDF}
+            disabled={exportingPDF}
+            className={`flex-1 h-12 rounded-xl border border-white/10 bg-white/5 flex-row items-center justify-center gap-2 active:scale-95 transition-transform ${exportingPDF ? 'opacity-60' : ''}`}
+          >
+            {exportingPDF ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <FileText size={20} color="white" />
+            )}
+            <Text className="text-white text-sm font-bold font-display">
+              {exportingPDF ? 'Exporting...' : 'Export PDF'}
+            </Text>
           </Pressable>
-          <Pressable className="flex-1 h-12 rounded-xl border border-white/10 bg-white/5 flex-row items-center justify-center gap-2 active:scale-95 transition-transform">
-            <TableProperties size={20} color="white" />
-            <Text className="text-white text-sm font-bold font-display">Export CSV</Text>
+          <Pressable
+            onPress={handleExportCSV}
+            disabled={exportingCSV}
+            className={`flex-1 h-12 rounded-xl border border-white/10 bg-white/5 flex-row items-center justify-center gap-2 active:scale-95 transition-transform ${exportingCSV ? 'opacity-60' : ''}`}
+          >
+            {exportingCSV ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <TableProperties size={20} color="white" />
+            )}
+            <Text className="text-white text-sm font-bold font-display">
+              {exportingCSV ? 'Exporting...' : 'Export CSV'}
+            </Text>
           </Pressable>
         </View>
       </ScrollView >

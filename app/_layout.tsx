@@ -24,6 +24,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import "../global.css";
 import { AuthProvider } from "../context/AuthContext";
 import { TransactionProvider } from "../context/TransactionContext";
+import { PreferencesProvider } from "../context/PreferencesContext";
+import { OfflineProvider } from "../context/OfflineContext";
 
 // Configure Reanimated logger to disable strict mode (suppress false positives during navigation)
 configureReanimatedLogger({
@@ -61,23 +63,27 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <TransactionProvider>
-          <ThemeProvider value={DefaultTheme}>
-            <Stack
-              screenOptions={({ route }) => ({
-                headerShown: !route.name.startsWith("tempobook"),
-              })}
-            >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="auth" options={{ headerShown: false }} />
-              <Stack.Screen name="transaction-modal" options={{ presentation: 'modal', headerShown: false }} />
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-            </Stack>
-            <StatusBar style="auto" />
-          </ThemeProvider>
-        </TransactionProvider>
-      </AuthProvider>
+      <PreferencesProvider>
+        <AuthProvider>
+          <OfflineProvider>
+            <TransactionProvider>
+              <ThemeProvider value={DefaultTheme}>
+                <Stack
+                  screenOptions={({ route }) => ({
+                    headerShown: !route.name.startsWith("tempobook"),
+                  })}
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="auth" options={{ headerShown: false }} />
+                  <Stack.Screen name="transaction-modal" options={{ presentation: 'modal', headerShown: false }} />
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                </Stack>
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </TransactionProvider>
+          </OfflineProvider>
+        </AuthProvider>
+      </PreferencesProvider>
     </GestureHandlerRootView>
   );
 }

@@ -1,6 +1,7 @@
 import { View, Text, TextInput, Pressable, ScrollView, Platform, SectionList, Alert } from 'react-native';
 import React, { useState, useMemo } from 'react';
 import { useTransactions, Transaction } from '../../context/TransactionContext';
+import { usePreferences } from '../../context/PreferencesContext';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -8,19 +9,12 @@ import {
   Plus,
   Search,
   Calendar,
-  Music,
-  Utensils,
-  ShoppingBag,
-  Briefcase,
-  Smartphone,
-  Home,
-  Zap,
-  Tag,
-  Car
+  Tag
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { rfs, rs, getIconSize, getContainerPadding, spacing, typography } from '../../lib/responsive';
 import TransactionActionModal from '../../components/transactions/TransactionActionModal';
+import { getIconComponent } from '../../lib/preferences';
 
 const GlassPanel = ({ children, className = "", style = {}, onPress }: { children: React.ReactNode, className?: string, style?: any, onPress?: () => void }) => {
   const Container = onPress ? Pressable : View;
@@ -56,34 +50,11 @@ export default function TransactionsScreen() {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
   const { transactions, totals, deleteTransaction, loadMore, hasMore, loading } = useTransactions();
+  const { formatCurrency, getCategoryById } = usePreferences();
 
   // Modal state
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-
-  const getCategoryIcon = (category: string) => {
-    const cat = category.toLowerCase();
-    if (cat.includes('food') || cat.includes('restaurant')) return Utensils;
-    if (cat.includes('shopping') || cat.includes('store')) return ShoppingBag;
-    if (cat.includes('transport') || cat.includes('uber')) return Car;
-    if (cat.includes('work') || cat.includes('salary') || cat.includes('freelance')) return Briefcase;
-    if (cat.includes('tech') || cat.includes('phone') || cat.includes('electronics')) return Smartphone;
-    if (cat.includes('subscription') || cat.includes('spotify') || cat.includes('netflix')) return Music;
-    if (cat.includes('home') || cat.includes('rent')) return Home;
-    if (cat.includes('utility') || cat.includes('bill')) return Zap;
-    return Tag;
-  };
-
-  // Unused functions removed: getIconColor, getIconBg
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -365,7 +336,12 @@ export default function TransactionsScreen() {
           </View>
         )}
         renderItem={({ item }) => {
-          const Icon = getCategoryIcon(item.category);
+          const categoryInfo = getCategoryById(item.category);
+          const Icon = getIconComponent(categoryInfo?.icon || 'Tag');
+          const categoryColor = categoryInfo?.color || '#6b7280';
+          const isIncome = item.type === 'income' || item.type === 'borrowed';
+          const displayColor = isIncome ? '#36e27b' : categoryColor;
+
           return (
             <View style={{ paddingHorizontal: containerPadding, marginBottom: spacing.md }}>
               <GlassPanel
@@ -374,19 +350,27 @@ export default function TransactionsScreen() {
                 onPress={() => handleTransactionPress(item)}
               >
                 <View style={{ gap: spacing.lg }} className="flex-row items-center flex-1 overflow-hidden">
-                  <View style={{ width: rs(48), height: rs(48) }} className={`items-center justify-center rounded-full shrink-0 border ${item.type === 'income' ? 'bg-primary/10 border-primary/30' : 'bg-white/5 border-white/10'}`}>
-                    <Icon size={iconSize} color={item.type === 'income' ? '#36e27b' : 'rgba(255,255,255,0.8)'} />
+                  <View
+                    style={{
+                      width: rs(48),
+                      height: rs(48),
+                      backgroundColor: `${displayColor}15`,
+                      borderColor: `${displayColor}30`
+                    }}
+                    className="items-center justify-center rounded-full shrink-0 border"
+                  >
+                    <Icon size={iconSize} color={displayColor} />
                   </View>
                   <View className="flex-1 justify-center">
                     <Text style={{ fontSize: typography.base }} className="text-white font-bold leading-tight truncate font-display" numberOfLines={1}>{item.title}</Text>
-                    <Text style={{ fontSize: typography.xs, marginTop: spacing.xs }} className={`${item.type === 'income' ? 'text-[#95c6a9]' : 'text-white/50'} font-normal truncate font-body`} numberOfLines={1}>
-                      {item.category} • {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <Text style={{ fontSize: typography.xs, marginTop: spacing.xs }} className={`${isIncome ? 'text-[#95c6a9]' : 'text-white/50'} font-normal truncate font-body`} numberOfLines={1}>
+                      {categoryInfo?.label || item.category} • {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                   </View>
                 </View>
                 <View className="shrink-0 text-right">
-                  <Text style={{ fontSize: typography.base }} className={`${item.type === 'income' ? 'text-primary' : 'text-red-500'} font-bold leading-normal font-display`}>
-                    {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount)}
+                  <Text style={{ fontSize: typography.base }} className={`${isIncome ? 'text-primary' : 'text-red-500'} font-bold leading-normal font-display`}>
+                    {isIncome ? '+' : '-'}{formatCurrency(item.amount)}
                   </Text>
                 </View>
               </GlassPanel>

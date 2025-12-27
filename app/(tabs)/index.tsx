@@ -8,17 +8,15 @@ import {
   Bell,
   ArrowDown,
   ArrowUp,
-  Film,
-  ShoppingCart,
-  DollarSign,
-  Car,
   Plus,
-  Utensils
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTransactions } from '../../context/TransactionContext';
 import { useAuth } from '../../context/AuthContext';
+import { usePreferences } from '../../context/PreferencesContext';
 import { rs, getIconSize, getContainerPadding } from '../../lib/responsive';
+import { getIconComponent, getCategoryColor } from '../../lib/preferences';
+import { getRelativeTime } from '../../utils/formatting';
 
 // const { width } = Dimensions.get('window'); // Unused
 const containerPadding = getContainerPadding();
@@ -40,19 +38,21 @@ export default function Dashboard() {
   const router = useRouter();
   const { totals, transactions } = useTransactions();
   const { profile, user } = useAuth();
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount);
-  };
+  const { formatCurrency, currencySymbol, getCategoryById } = usePreferences();
 
   const formatMainBalance = (amount: number) => {
-    const parts = formatCurrency(amount).split('.');
+    const formatted = formatCurrency(amount);
+    // Try to split at decimal point
+    const parts = formatted.split('.');
+    if (parts.length === 2) {
+      return {
+        main: parts[0],
+        decimal: parts[1].replace(/[^0-9]/g, '').substring(0, 2) || '00'
+      };
+    }
     return {
-      main: parts[0],
-      decimal: parts[1] || '00'
+      main: formatted,
+      decimal: '00'
     };
   };
 
@@ -172,55 +172,31 @@ export default function Dashboard() {
 
             <View className="gap-3">
               {transactions.slice(0, 4).map((transaction) => {
-                const getCategoryIcon = (category: string) => {
-                  const cat = category.toLowerCase();
-                  if (cat.includes('food') || cat.includes('restaurant')) return Utensils;
-                  if (cat.includes('shopping') || cat.includes('store')) return ShoppingCart;
-                  if (cat.includes('transport') || cat.includes('uber') || cat.includes('travel')) return Car;
-                  if (cat.includes('work') || cat.includes('salary') || cat.includes('freelance')) return DollarSign;
-                  if (cat.includes('subscription') || cat.includes('spotify') || cat.includes('netflix')) return Film;
-                  return DollarSign;
-                };
-
-                const getCategoryColor = (category: string, type: string) => {
-                  if (type === 'income') return { bg: 'bg-emerald-500/20', border: 'border-emerald-500/10', icon: '#10b981' };
-                  const cat = category.toLowerCase();
-                  if (cat.includes('food')) return { bg: 'bg-orange-500/20', border: 'border-orange-500/10', icon: '#f97316' };
-                  if (cat.includes('shopping')) return { bg: 'bg-purple-500/20', border: 'border-purple-500/10', icon: '#a855f7' };
-                  if (cat.includes('transport') || cat.includes('travel')) return { bg: 'bg-blue-500/20', border: 'border-blue-500/10', icon: '#3b82f6' };
-                  if (cat.includes('subscription')) return { bg: 'bg-red-500/20', border: 'border-red-500/10', icon: '#ef4444' };
-                  return { bg: 'bg-gray-500/20', border: 'border-gray-500/10', icon: '#6b7280' };
-                };
-
-                const Icon = getCategoryIcon(transaction.category);
-                const colors = getCategoryColor(transaction.category, transaction.type);
+                // Get category info from preferences
+                const categoryInfo = getCategoryById(transaction.category);
+                const Icon = getIconComponent(categoryInfo?.icon || 'DollarSign');
+                const categoryColor = categoryInfo?.color || '#6b7280';
                 const isIncome = transaction.type === 'income' || transaction.type === 'borrowed';
 
-                const getRelativeTime = (dateStr: string) => {
-                  const date = new Date(dateStr);
-                  const now = new Date();
-                  const diffMs = now.getTime() - date.getTime();
-                  const diffMins = Math.floor(diffMs / 60000);
-                  const diffHours = Math.floor(diffMs / 3600000);
-                  const diffDays = Math.floor(diffMs / 86400000);
-
-                  if (diffMins < 60) return diffMins === 0 ? 'Just now' : `${diffMins}m ago`;
-                  if (diffHours < 24) return `${diffHours}h ago`;
-                  if (diffDays === 0) return 'Today';
-                  if (diffDays === 1) return 'Yesterday';
-                  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                };
+                // Use income color override
+                const displayColor = isIncome ? '#10b981' : categoryColor;
 
                 return (
                   <GlassPanel key={transaction.id} className="p-4 flex-row items-center justify-between">
                     <View className="flex-row items-center gap-4">
-                      <View className={`w-12 h-12 rounded-full ${colors.bg} flex items-center justify-center border ${colors.border}`}>
-                        <Icon size={20} color={colors.icon} />
+                      <View
+                        className="w-12 h-12 rounded-full flex items-center justify-center border"
+                        style={{
+                          backgroundColor: `${displayColor}20`,
+                          borderColor: `${displayColor}10`
+                        }}
+                      >
+                        <Icon size={20} color={displayColor} />
                       </View>
                       <View>
                         <Text className="text-white font-bold text-sm font-display">{transaction.title}</Text>
                         <Text className="text-gray-400 text-xs font-display">
-                          {transaction.category.charAt(0).toUpperCase() + transaction.category.slice(1)} • {getRelativeTime(transaction.date)}
+                          {categoryInfo?.label || transaction.category} • {getRelativeTime(transaction.date)}
                         </Text>
                       </View>
                     </View>

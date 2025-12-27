@@ -2,9 +2,10 @@ import { View, Text, Switch, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
 import { useColorScheme } from 'nativewind';
-import { Moon, Sun, ChevronRight, User, Bell, Shield, LogOut } from 'lucide-react-native';
+import { Moon, Sun, ChevronRight, User, Bell, Shield, LogOut, Coins, FolderTree } from 'lucide-react-native';
 import FadeInView from '../../components/ui/FadeInView';
 import { useAuth } from '../../context/AuthContext';
+import { usePreferences } from '../../context/PreferencesContext';
 
 import { useRouter } from 'expo-router';
 
@@ -12,19 +13,25 @@ export default function Settings() {
   const router = useRouter();
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const { signOut } = useAuth();
+  const { currency } = usePreferences();
   const isDark = colorScheme === 'dark';
 
-  const SettingItem = ({ icon: Icon, title, value, onPress }: any) => (
+  const SettingItem = ({ icon: Icon, title, subtitle, value, onPress }: any) => (
     <TouchableOpacity
       onPress={onPress}
       className="flex-row items-center justify-between py-4 border-b border-gray-100 dark:border-gray-800 active:bg-gray-50 dark:active:bg-gray-800/50 rounded-lg px-1"
       activeOpacity={0.7}
     >
-      <View className="flex-row items-center">
+      <View className="flex-row items-center flex-1">
         <View className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-gray-800 items-center justify-center mr-3.5">
           <Icon size={20} color={isDark ? '#E5E7EB' : '#374151'} strokeWidth={2.5} />
         </View>
-        <Text className="text-base font-body font-semibold text-text-primary dark:text-text-dark">{title}</Text>
+        <View className="flex-1">
+          <Text className="text-base font-body font-semibold text-text-primary dark:text-text-dark">{title}</Text>
+          {subtitle && (
+            <Text className="text-xs text-gray-500 mt-0.5">{subtitle}</Text>
+          )}
+        </View>
       </View>
       <View className="flex-row items-center">
         {value}
@@ -56,8 +63,24 @@ export default function Settings() {
           />
         </FadeInView>
 
+        <FadeInView delay={75} className="bg-card-light dark:bg-card-dark rounded-2xl p-5 shadow-md border border-gray-100 dark:border-gray-800 mb-6">
+          <Text className="text-xs font-display font-bold text-text-secondary mb-3 uppercase tracking-wider">Preferences</Text>
+          <SettingItem
+            icon={Coins}
+            title="Currency"
+            subtitle={`${currency.name} (${currency.symbol})`}
+            onPress={() => router.push('/settings/currency')}
+          />
+          <SettingItem
+            icon={FolderTree}
+            title="Categories"
+            subtitle="Manage expense & income categories"
+            onPress={() => router.push('/settings/categories')}
+          />
+        </FadeInView>
+
         <FadeInView delay={100} className="bg-card-light dark:bg-card-dark rounded-2xl p-5 shadow-md border border-gray-100 dark:border-gray-800">
-          <Text className="text-xs font-display font-bold text-text-secondary mb-3 uppercase tracking-wider">General</Text>
+          <Text className="text-xs font-display font-bold text-text-secondary mb-3 uppercase tracking-wider">Account</Text>
           <SettingItem icon={User} title="Profile" onPress={() => router.push('/settings/profile')} />
           <SettingItem icon={Bell} title="Notifications" onPress={() => router.push('/settings/notifications')} />
           <SettingItem icon={Shield} title="Security" onPress={() => router.push('/settings/security')} />

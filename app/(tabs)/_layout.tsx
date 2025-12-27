@@ -11,6 +11,8 @@ import { Home, BarChart2, Wallet, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { rfs, rs, getIconSize, MIN_TOUCH_TARGET } from '../../lib/responsive';
+import { OfflineBanner } from '../../components/ui/OfflineBanner';
+import { useOffline } from '../../context/OfflineContext';
 import Animated, {
   useAnimatedStyle,
   interpolate,
@@ -290,45 +292,55 @@ const styles = StyleSheet.create({
 
 export default function TabLayout() {
   const iconSize = getIconSize(24);
+  const { isOnline, pendingCount, isSyncing, syncError, syncNow } = useOffline();
 
   return (
-    <MaterialTopTabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      tabBarPosition="bottom"
-      screenOptions={{
-        swipeEnabled: true,
-        animationEnabled: true,
-        tabBarIndicatorStyle: { height: 0 }, // Hide default indicator
-      }}
-    >
-      <MaterialTopTabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }: any) => <Home size={iconSize} color={color} />,
-        }}
+    <View style={{ flex: 1 }}>
+      <OfflineBanner
+        isOnline={isOnline}
+        pendingCount={pendingCount}
+        isSyncing={isSyncing}
+        syncError={syncError}
+        onSyncPress={syncNow}
       />
-      <MaterialTopTabs.Screen
-        name="charts"
-        options={{
-          title: 'Analytics',
-          tabBarIcon: ({ color }: any) => <BarChart2 size={iconSize} color={color} />,
+      <MaterialTopTabs
+        tabBar={(props) => <CustomTabBar {...props} />}
+        tabBarPosition="bottom"
+        screenOptions={{
+          swipeEnabled: true,
+          animationEnabled: true,
+          tabBarIndicatorStyle: { height: 0 }, // Hide default indicator
         }}
-      />
-      <MaterialTopTabs.Screen
-        name="transactions"
-        options={{
-          title: 'Wallet',
-          tabBarIcon: ({ color }: any) => <Wallet size={iconSize} color={color} />,
-        }}
-      />
-      <MaterialTopTabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }: any) => <Settings size={iconSize} color={color} />,
-        }}
-      />
-    </MaterialTopTabs>
+      >
+        <MaterialTopTabs.Screen
+          name="index"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color }: any) => <Home size={iconSize} color={color} />,
+          }}
+        />
+        <MaterialTopTabs.Screen
+          name="charts"
+          options={{
+            title: 'Analytics',
+            tabBarIcon: ({ color }: any) => <BarChart2 size={iconSize} color={color} />,
+          }}
+        />
+        <MaterialTopTabs.Screen
+          name="transactions"
+          options={{
+            title: 'Wallet',
+            tabBarIcon: ({ color }: any) => <Wallet size={iconSize} color={color} />,
+          }}
+        />
+        <MaterialTopTabs.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
+            tabBarIcon: ({ color }: any) => <Settings size={iconSize} color={color} />,
+          }}
+        />
+      </MaterialTopTabs>
+    </View>
   );
 }

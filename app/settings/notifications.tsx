@@ -1,12 +1,12 @@
-import { View, Text, Switch, Pressable, Alert, ScrollView } from 'react-native';
+import { View, Text, Switch, Pressable, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Bell, BellRing, Clock, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, Bell, BellRing, Clock, AlertTriangle, Zap } from 'lucide-react-native';
 import FadeInView from '../../components/ui/FadeInView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { scheduleDailyReminder, cancelDailyReminder, requestPermissions } from '../../utils/notifications';
+import { scheduleDailyReminder, cancelDailyReminder, requestPermissions, sendTestNotification } from '../../utils/notifications';
 
 // Check if running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -18,6 +18,7 @@ export default function NotificationSettings() {
     const [enabled, setEnabled] = useState(false);
     const [dailyReminder, setDailyReminder] = useState(false);
     const [budgetAlerts, setBudgetAlerts] = useState(false);
+    const [testing, setTesting] = useState(false);
     // const [notificationsAvailable] = useState(!isExpoGo); // Unused state setter, just use isExpoGo or initialized val
     const notificationsAvailable = !isExpoGo;
 
@@ -76,6 +77,21 @@ export default function NotificationSettings() {
         } else {
             // We can't actually disable system permissions programmatically, just our local "toggle" state visually
             Alert.alert('System Settings', 'To disable notifications, please go to your device settings.');
+        }
+    }
+
+    async function handleTestNotification() {
+        if (testing) return;
+        setTesting(true);
+        try {
+            const success = await sendTestNotification();
+            if (!success) {
+                Alert.alert('Test Failed', 'Could not send test notification. Please check notification permissions.');
+            }
+        } catch (e) {
+            Alert.alert('Error', 'Failed to send test notification.');
+        } finally {
+            setTesting(false);
         }
     }
 
@@ -166,6 +182,25 @@ export default function NotificationSettings() {
                         </View>
 
                     </View>
+
+                    {/* Test Notification Button */}
+                    <Pressable
+                        onPress={handleTestNotification}
+                        disabled={!enabled || testing}
+                        className={`mt-6 py-4 px-6 rounded-2xl flex-row items-center justify-center gap-3 ${enabled ? 'bg-primary' : 'bg-gray-400'} ${testing ? 'opacity-60' : ''}`}
+                    >
+                        {testing ? (
+                            <ActivityIndicator size="small" color="white" />
+                        ) : (
+                            <Zap size={20} color="white" />
+                        )}
+                        <Text className="text-white font-bold font-display">
+                            {testing ? 'Sending...' : 'Send Test Notification'}
+                        </Text>
+                    </Pressable>
+                    <Text className="text-xs text-text-secondary text-center mt-2">
+                        Tap to verify notifications are working correctly
+                    </Text>
                 </FadeInView>
             </ScrollView>
         </SafeAreaView>
