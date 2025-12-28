@@ -3,6 +3,7 @@ import { useNetworkStatus, checkNetworkStatus } from './useNetworkStatus';
 import { offlineQueue, TransactionCache, PendingTransaction } from '../utils/offlineQueue';
 import * as api from '../lib/api/transactions';
 import { Transaction } from '../lib/types';
+import { InteractionManager } from 'react-native';
 
 interface SyncState {
     isSyncing: boolean;
@@ -19,7 +20,7 @@ interface UseOfflineSyncOptions {
 
 /**
  * Hook to manage offline synchronization
- * Automatically syncs pending transactions when network is restored
+ * Optimized to minimize re-renders and defer heavy operations
  */
 export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOfflineSyncOptions) {
     const networkStatus = useNetworkStatus();
@@ -31,12 +32,27 @@ export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOffli
     });
 
     const isSyncingRef = useRef(false);
-    const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const lastOnlineState = useRef<boolean>(true);
 
-    // Update pending count
+    // Debounced pending count update
+    const pendingCountTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const updatePendingCount = useCallback(async () => {
-        const stats = await offlineQueue.getStats();
-        setSyncState(prev => ({ ...prev, pendingCount: stats.pendingCount }));
+        // Clear existing timeout
+        if (pendingCountTimeoutRef.current) {
+            clearTimeout(pendingCountTimeoutRef.current);
+        }
+
+        // Debounce the update
+        pendingCountTimeoutRef.current = setTimeout(async () => {
+            const stats = await offlineQueue.getStats();
+            setSyncState(prev => {
+                // Only update if changed
+                if (prev.pendingCount === stats.pendingCount) return prev;
+                return { ...prev, pendingCount: stats.pendingCount };
+            });
+        }, 300);
     }, []);
 
     // Process a single pending transaction
@@ -44,32 +60,81 @@ export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOffli
         if (!userId) return false;
 
         try {
+            console.log(`[SYNC] Processing ${pending.action} transaction:`, {
+                pendingId: pending.id,
+                transactionType: pending.data.type,
+                transactionId: pending.data.id,
+            });
+
             switch (pending.action) {
                 case 'add':
-                    const { id, ...addData } = pending.data;
+                    // Extract and exclude the temporary ID - server will generate a proper UUID
+                    // Also remove icon and any other non-database fields
+                    const { id: tempId, icon, user_id, ...addData } = pending.data as Transaction & { user_id?: string };
+
+                    console.log('[SYNC] Add transaction data:', {
+                        type: addData.type,
+                        category: addData.category,
+                        amount: addData.amount,
+                        title: addData.title,
+                        date: addData.date,
+                    });
+
+                    // Only sync if we have the required fields
+                    if (!addData.title || !addData.amount || !addData.type || !addData.category || !addData.date) {
+                        console.error('[SYNC] Missing required fields for add transaction:', addData);
+                        await offlineQueue.complete(pending.id);
+                        return false;
+                    }
+
+                    console.log('[SYNC] Calling API to add transaction...');
                     await api.addTransactionApi(userId, addData as Omit<Transaction, 'id' | 'created_at' | 'icon'>);
+                    console.log('[SYNC] Transaction added successfully');
                     break;
 
                 case 'update':
-                    const { id: updateId, ...updateData } = pending.data;
+                    // Remove non-database fields from update data
+                    const { id: updateId, icon: updateIcon, user_id: updateUserId, ...updateData } = pending.data as Transaction & { user_id?: string };
+                    // Skip if the ID is a temporary ID (it was never synced to server)
+                    if (updateId.startsWith('temp_')) {
+                        console.warn('[SYNC] Skipping update for temporary transaction:', updateId);
+                        await offlineQueue.complete(pending.id);
+                        return true;
+                    }
+                    console.log('[SYNC] Calling API to update transaction...');
                     await api.updateTransactionApi(userId, updateId, updateData);
+                    console.log('[SYNC] Transaction updated successfully');
                     break;
 
                 case 'delete':
+                    // Skip if the ID is a temporary ID (it was never synced to server)
+                    if (pending.data.id.startsWith('temp_')) {
+                        console.warn('[SYNC] Skipping delete for temporary transaction:', pending.data.id);
+                        await offlineQueue.complete(pending.id);
+                        return true;
+                    }
+                    console.log('[SYNC] Calling API to delete transaction...');
                     await api.deleteTransactionApi(userId, pending.data.id);
+                    console.log('[SYNC] Transaction deleted successfully');
                     break;
             }
 
             await offlineQueue.complete(pending.id);
+            console.log(`[SYNC] Completed ${pending.action} transaction successfully`);
             return true;
-        } catch (error) {
-            console.error(`Failed to sync transaction ${pending.id}:`, error);
+        } catch (error: any) {
+            console.error(`[SYNC] Failed to sync ${pending.action} transaction ${pending.id}:`, {
+                error: error?.message || error,
+                details: error?.details || error?.hint || error,
+                code: error?.code,
+                transactionType: pending.data.type,
+            });
             await offlineQueue.incrementRetry(pending.id);
             return false;
         }
     }, [userId]);
 
-    // Main sync function
+    // Main sync function - deferred to avoid blocking UI
     const syncPendingTransactions = useCallback(async (): Promise<boolean> => {
         if (!userId || isSyncingRef.current) return false;
 
@@ -78,18 +143,26 @@ export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOffli
         if (!isOnline) return false;
 
         isSyncingRef.current = true;
-        setSyncState(prev => ({ ...prev, isSyncing: true, syncError: null }));
+
+        // Defer state update to avoid blocking
+        InteractionManager.runAfterInteractions(() => {
+            setSyncState(prev => ({ ...prev, isSyncing: true, syncError: null }));
+        });
 
         try {
+            // Force reload the queue to get the latest data
+            await offlineQueue.load(true);
             const pending = await offlineQueue.getPending();
 
             if (pending.length === 0) {
-                setSyncState(prev => ({
-                    ...prev,
-                    isSyncing: false,
-                    pendingCount: 0,
-                    lastSyncTime: Date.now(),
-                }));
+                InteractionManager.runAfterInteractions(() => {
+                    setSyncState(prev => ({
+                        ...prev,
+                        isSyncing: false,
+                        pendingCount: 0,
+                        lastSyncTime: Date.now(),
+                    }));
+                });
                 isSyncingRef.current = false;
                 return true;
             }
@@ -110,21 +183,20 @@ export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOffli
             }
 
             // Remove items that have exceeded max retries
-            const failed = await offlineQueue.removeFailedItems(5);
-            if (failed.length > 0) {
-                console.warn(`Removed ${failed.length} transactions that exceeded max retries`);
-            }
+            await offlineQueue.removeFailedItems(5);
 
             // Update stats
             const stats = await offlineQueue.getStats();
 
-            setSyncState(prev => ({
-                ...prev,
-                isSyncing: false,
-                pendingCount: stats.pendingCount,
-                lastSyncTime: Date.now(),
-                syncError: failCount > 0 ? `${failCount} transactions failed to sync` : null,
-            }));
+            InteractionManager.runAfterInteractions(() => {
+                setSyncState(prev => ({
+                    ...prev,
+                    isSyncing: false,
+                    pendingCount: stats.pendingCount,
+                    lastSyncTime: Date.now(),
+                    syncError: failCount > 0 ? `${failCount} failed` : null,
+                }));
+            });
 
             if (successCount > 0) {
                 onSyncComplete?.();
@@ -136,12 +208,14 @@ export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOffli
 
             return failCount === 0;
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown sync error';
-            setSyncState(prev => ({
-                ...prev,
-                isSyncing: false,
-                syncError: errorMessage,
-            }));
+            const errorMessage = error instanceof Error ? error.message : 'Sync error';
+            InteractionManager.runAfterInteractions(() => {
+                setSyncState(prev => ({
+                    ...prev,
+                    isSyncing: false,
+                    syncError: errorMessage,
+                }));
+            });
             onSyncError?.(error instanceof Error ? error : new Error(errorMessage));
             return false;
         } finally {
@@ -149,19 +223,28 @@ export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOffli
         }
     }, [userId, processPendingTransaction, onSyncComplete, onSyncError]);
 
-    // Auto-sync when coming back online
+    // Only sync when transitioning from offline to online
     useEffect(() => {
-        if (networkStatus.isConnected && networkStatus.isInternetReachable) {
-            syncPendingTransactions();
+        const currentOnlineState = networkStatus.isConnected && networkStatus.isInternetReachable !== false;
+
+        if (currentOnlineState && !lastOnlineState.current) {
+            // Just came online - defer sync to avoid UI jank
+            InteractionManager.runAfterInteractions(() => {
+                syncPendingTransactions();
+            });
         }
+
+        lastOnlineState.current = currentOnlineState;
     }, [networkStatus.isConnected, networkStatus.isInternetReachable, syncPendingTransactions]);
 
-    // Periodic sync check (every 30 seconds when online)
+    // Periodic sync check (every 60 seconds when online) - reduced frequency
     useEffect(() => {
         if (networkStatus.isConnected && userId) {
             syncIntervalRef.current = setInterval(() => {
-                syncPendingTransactions();
-            }, 30000);
+                if (!isSyncingRef.current) {
+                    syncPendingTransactions();
+                }
+            }, 60000); // Increased to 60 seconds
         }
 
         return () => {
@@ -171,10 +254,21 @@ export function useOfflineSync({ userId, onSyncComplete, onSyncError }: UseOffli
         };
     }, [networkStatus.isConnected, userId, syncPendingTransactions]);
 
-    // Initial pending count load
+    // Initial pending count load - deferred
     useEffect(() => {
-        updatePendingCount();
+        InteractionManager.runAfterInteractions(() => {
+            updatePendingCount();
+        });
     }, [updatePendingCount]);
+
+    // Cleanup
+    useEffect(() => {
+        return () => {
+            if (pendingCountTimeoutRef.current) {
+                clearTimeout(pendingCountTimeoutRef.current);
+            }
+        };
+    }, []);
 
     return {
         ...syncState,

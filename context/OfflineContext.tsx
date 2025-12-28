@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { useOfflineSync } from '../hooks/useOfflineSync';
-import { offlineQueue, TransactionCache, PendingTransaction } from '../utils/offlineQueue';
+import { offlineQueue, TransactionCache } from '../utils/offlineQueue';
 import { Transaction } from '../lib/types';
 import { checkNetworkStatus } from '../hooks/useNetworkStatus';
 
@@ -63,100 +63,92 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Generate a temporary ID for offline transactions
-    const generateTempId = (): string => {
+    const generateTempId = useCallback((): string => {
         return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    };
+    }, []);
 
     // Add transaction with offline support
     const addTransactionOffline = useCallback(async (
         transaction: Omit<Transaction, 'id' | 'created_at' | 'icon'>
     ): Promise<string> => {
+        if (!user) {
+            throw new Error('User not authenticated');
+        }
+
         const tempId = generateTempId();
         const fullTransaction: Transaction = {
             ...transaction,
             id: tempId,
+            // Ensure date is properly formatted
+            date: transaction.date || new Date().toISOString().split('T')[0],
         };
 
-        // Check if online
-        const online = await checkNetworkStatus();
+        // Queue for sync with user_id included for proper server sync
+        await offlineQueue.add('add', { ...fullTransaction, user_id: user.id } as any);
 
-        if (!online) {
-            // Queue for later sync
-            await offlineQueue.add('add', fullTransaction);
-
-            // Update local cache immediately for responsive UI
-            const cached = await TransactionCache.loadFromCache();
-            if (cached) {
-                const updatedTransactions = [fullTransaction, ...cached.transactions];
-                await TransactionCache.saveToCache(updatedTransactions);
-            } else {
-                await TransactionCache.saveToCache([fullTransaction]);
-            }
-
-            await updatePendingCount();
-            return tempId;
+        // Update local cache
+        const cached = await TransactionCache.loadFromCache();
+        if (cached) {
+            const updatedTransactions = [fullTransaction, ...cached.transactions];
+            await TransactionCache.saveToCache(updatedTransactions);
+        } else {
+            await TransactionCache.saveToCache([fullTransaction]);
         }
 
-        // If online, the actual API call will be handled by TransactionContext
-        // This method is for offline-first scenarios
-        await offlineQueue.add('add', fullTransaction);
-        await updatePendingCount();
+        // Update pending count (debounced internally)
+        updatePendingCount();
 
-        // Trigger sync immediately
-        syncNow();
+        // Try to sync if online
+        const online = await checkNetworkStatus();
+        if (online) {
+            // Don't await - let it sync in background
+            syncNow();
+        }
 
         return tempId;
-    }, [syncNow, updatePendingCount]);
+    }, [user, generateTempId, syncNow, updatePendingCount]);
 
     // Update transaction with offline support
     const updateTransactionOffline = useCallback(async (
         id: string,
         updates: Partial<Transaction>
     ): Promise<void> => {
-        const online = await checkNetworkStatus();
+        await offlineQueue.add('update', { id, ...updates });
 
-        if (!online) {
-            await offlineQueue.add('update', { id, ...updates });
-
-            // Update local cache
-            const cached = await TransactionCache.loadFromCache();
-            if (cached) {
-                const updatedTransactions = cached.transactions.map(t =>
-                    t.id === id ? { ...t, ...updates } : t
-                );
-                await TransactionCache.saveToCache(updatedTransactions);
-            }
-
-            await updatePendingCount();
-            return;
+        // Update local cache
+        const cached = await TransactionCache.loadFromCache();
+        if (cached) {
+            const updatedTransactions = cached.transactions.map(t =>
+                t.id === id ? { ...t, ...updates } : t
+            );
+            await TransactionCache.saveToCache(updatedTransactions);
         }
 
-        await offlineQueue.add('update', { id, ...updates });
-        await updatePendingCount();
-        syncNow();
+        updatePendingCount();
+
+        const online = await checkNetworkStatus();
+        if (online) {
+            syncNow();
+        }
     }, [syncNow, updatePendingCount]);
 
     // Delete transaction with offline support
     const deleteTransactionOffline = useCallback(async (id: string): Promise<void> => {
-        const online = await checkNetworkStatus();
+        await offlineQueue.add('delete', { id } as any);
 
-        if (!online) {
-            await offlineQueue.add('delete', { id } as any);
-
-            // Update local cache
-            const cached = await TransactionCache.loadFromCache();
-            if (cached) {
-                const updatedTransactions = cached.transactions.filter(t => t.id !== id);
-                await TransactionCache.saveToCache(updatedTransactions);
-            }
-
-            await updatePendingCount();
-            return;
+        // Update local cache
+        const cached = await TransactionCache.loadFromCache();
+        if (cached) {
+            const updatedTransactions = cached.transactions.filter(t => t.id !== id);
+            await TransactionCache.saveToCache(updatedTransactions);
         }
 
-        await offlineQueue.add('delete', { id } as any);
-        await updatePendingCount();
-        syncNow();
+        updatePendingCount();
+
+        const online = await checkNetworkStatus();
+        if (online) {
+            syncNow();
+        }
     }, [syncNow, updatePendingCount]);
 
     // Get cached transactions with pending changes applied
@@ -165,13 +157,11 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         const pending = await offlineQueue.getPending();
 
         if (!cached) {
-            // Return just the pending adds if no cache
             return pending
                 .filter(p => p.action === 'add')
                 .map(p => p.data as Transaction);
         }
 
-        // Apply pending changes to cached data
         return TransactionCache.applyPendingChanges(cached.transactions, pending);
     }, []);
 
@@ -180,7 +170,8 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         await TransactionCache.saveToCache(transactions);
     }, []);
 
-    const contextValue: OfflineContextType = {
+    // Memoize context value to prevent unnecessary re-renders
+    const contextValue = useMemo<OfflineContextType>(() => ({
         isOnline,
         isSyncing,
         pendingCount,
@@ -192,7 +183,19 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
         deleteTransactionOffline,
         getCachedTransactions,
         refreshCache,
-    };
+    }), [
+        isOnline,
+        isSyncing,
+        pendingCount,
+        syncError,
+        lastSyncTime,
+        syncNow,
+        addTransactionOffline,
+        updateTransactionOffline,
+        deleteTransactionOffline,
+        getCachedTransactions,
+        refreshCache,
+    ]);
 
     return (
         <OfflineContext.Provider value={contextValue}>

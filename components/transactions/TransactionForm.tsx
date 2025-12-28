@@ -147,7 +147,7 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         console.log('Updating transaction:', initialTransaction.id);
         await withTimeout(
           updateTransaction(initialTransaction.id, transactionData),
-          15000,
+          8000,
           'Update timed out. Please check your internet connection.'
         );
         console.log('Update successful');
@@ -155,8 +155,8 @@ export default function TransactionForm({ onClose, initialTransaction }: Transac
         console.log('Adding new transaction');
         await withTimeout(
           addTransaction(transactionData),
-          15000,
-          'Transaction save timed out. Please check your internet connection.'
+          8000,
+          'Save timed out. Please check your connection or database schema.'
         );
         console.log('Add successful');
       }

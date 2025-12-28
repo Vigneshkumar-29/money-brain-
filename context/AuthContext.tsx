@@ -64,14 +64,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const checkSession = async () => {
             try {
+                // Check for existing session
                 const { data: { session: initialSession } } = await supabase.auth.getSession();
 
                 if (mounted) {
                     setSession(initialSession);
-                    if (initialSession?.user) {
-                        await fetchProfile(initialSession.user.id);
-                    }
+                    // Critical: Stop loading immediately to show UI
                     setIsLoading(false);
+
+                    // Fetch profile in background if user exists
+                    if (initialSession?.user) {
+                        fetchProfile(initialSession.user.id);
+                    }
                 }
             } catch (error) {
                 console.error('Error checking session:', error);
@@ -86,7 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setSession(session);
                 if (session?.user) {
                     // Update profile on auth change
-                    await fetchProfile(session.user.id);
+                    // We don't await this to keep UI responsive
+                    fetchProfile(session.user.id);
                 } else {
                     setProfile(null);
                 }
@@ -109,8 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!user && !inAuthGroup) {
             // Redirect to the sign-in page.
             router.replace('/auth/login');
-        } else if (user && inAuthGroup) {
-            // Redirect away from the sign-in page.
+        } else if (user && (inAuthGroup || !segments[0])) {
+            // Redirect away from the sign-in page or root to the dashboard.
             router.replace('/(tabs)');
         }
     }, [session, segments, isLoading]);

@@ -18,6 +18,7 @@ import Animated, {
   interpolate,
   useSharedValue,
   useDerivedValue,
+  SharedValue,
 } from 'react-native-reanimated';
 
 // 1. Create the navigator instance
@@ -41,7 +42,7 @@ const TabIcon = ({
   Icon,
   label,
 }: {
-  progress: Animated.SharedValue<number>;
+  progress: SharedValue<number>;
   Icon: any;
   label: string;
 }) => {
@@ -70,7 +71,7 @@ const AnimatedIcon = ({
   progress
 }: {
   Icon: any;
-  progress: Animated.SharedValue<number>;
+  progress: SharedValue<number>;
 }) => {
   const animatedProps = useAnimatedStyle(() => {
     const opacity = interpolate(progress.value, [0, 1], [0.7, 1]);
@@ -101,7 +102,7 @@ const AnimatedLabel = ({
   progress
 }: {
   label: string;
-  progress: Animated.SharedValue<number>;
+  progress: SharedValue<number>;
 }) => {
   return (
     <View style={{ position: 'relative' }}>
@@ -130,7 +131,7 @@ const TabItem = ({
 }: {
   route: any;
   index: number;
-  position: Animated.SharedValue<number>;
+  position: SharedValue<number>;
   descriptors: any;
   navigation: any;
   state: any;

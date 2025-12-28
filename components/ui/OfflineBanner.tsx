@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo, useState } from 'react';
 import {
     View,
     Text,
@@ -7,7 +7,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
 } from 'react-native';
-import { Wifi, WifiOff, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react-native';
+import { WifiOff, RefreshCw, AlertCircle } from 'lucide-react-native';
 
 interface OfflineBannerProps {
     isOnline: boolean;
@@ -17,7 +17,7 @@ interface OfflineBannerProps {
     onSyncPress?: () => void;
 }
 
-export function OfflineBanner({
+function OfflineBannerComponent({
     isOnline,
     pendingCount,
     isSyncing,
@@ -25,43 +25,32 @@ export function OfflineBanner({
     onSyncPress,
 }: OfflineBannerProps) {
     const slideAnim = useRef(new Animated.Value(-100)).current;
-    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const [isVisible, setIsVisible] = useState(false);
 
     // Determine if banner should show
-    const shouldShow = !isOnline || pendingCount > 0 || isSyncing || syncError;
+    const shouldShow = !isOnline || (pendingCount > 0 && isSyncing) || !!syncError;
 
     useEffect(() => {
-        Animated.spring(slideAnim, {
+        if (shouldShow) {
+            setIsVisible(true);
+        }
+
+        Animated.timing(slideAnim, {
             toValue: shouldShow ? 0 : -100,
+            duration: 200,
             useNativeDriver: true,
-            tension: 100,
-            friction: 10,
-        }).start();
+        }).start(({ finished }) => {
+            // Hide component after animation completes when hiding
+            if (finished && !shouldShow) {
+                setIsVisible(false);
+            }
+        });
     }, [shouldShow, slideAnim]);
 
-    // Pulse animation for syncing
-    useEffect(() => {
-        if (isSyncing) {
-            const pulse = Animated.loop(
-                Animated.sequence([
-                    Animated.timing(pulseAnim, {
-                        toValue: 0.7,
-                        duration: 500,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(pulseAnim, {
-                        toValue: 1,
-                        duration: 500,
-                        useNativeDriver: true,
-                    }),
-                ])
-            );
-            pulse.start();
-            return () => pulse.stop();
-        } else {
-            pulseAnim.setValue(1);
-        }
-    }, [isSyncing, pulseAnim]);
+    // Don't render anything if not visible (performance optimization)
+    if (!isVisible && !shouldShow) {
+        return null;
+    }
 
     const getBannerConfig = () => {
         if (!isOnline) {
@@ -70,17 +59,17 @@ export function OfflineBanner({
                 icon: <WifiOff size={18} color="#FFF" />,
                 message: 'You\'re offline',
                 subMessage: pendingCount > 0
-                    ? `${pendingCount} pending transaction${pendingCount > 1 ? 's' : ''}`
-                    : 'Changes will sync when online',
+                    ? `${pendingCount} pending`
+                    : 'Changes sync when online',
             };
         }
 
-        if (isSyncing) {
+        if (isSyncing && pendingCount > 0) {
             return {
                 backgroundColor: '#3B82F6',
                 icon: <ActivityIndicator size="small" color="#FFF" />,
                 message: 'Syncing...',
-                subMessage: `Uploading ${pendingCount} transaction${pendingCount > 1 ? 's' : ''}`,
+                subMessage: `${pendingCount} remaining`,
             };
         }
 
@@ -90,15 +79,6 @@ export function OfflineBanner({
                 icon: <AlertCircle size={18} color="#FFF" />,
                 message: 'Sync failed',
                 subMessage: 'Tap to retry',
-            };
-        }
-
-        if (pendingCount > 0) {
-            return {
-                backgroundColor: '#10B981',
-                icon: <RefreshCw size={18} color="#FFF" />,
-                message: 'Ready to sync',
-                subMessage: `${pendingCount} pending transaction${pendingCount > 1 ? 's' : ''}`,
             };
         }
 
@@ -115,7 +95,6 @@ export function OfflineBanner({
                 {
                     backgroundColor: config.backgroundColor,
                     transform: [{ translateY: slideAnim }],
-                    opacity: pulseAnim,
                 },
             ]}
         >
@@ -132,7 +111,7 @@ export function OfflineBanner({
                     <Text style={styles.message}>{config.message}</Text>
                     <Text style={styles.subMessage}>{config.subMessage}</Text>
                 </View>
-                {isOnline && pendingCount > 0 && !isSyncing && (
+                {isOnline && syncError && !isSyncing && (
                     <View style={styles.syncButton}>
                         <RefreshCw size={16} color="#FFF" />
                     </View>
@@ -141,6 +120,16 @@ export function OfflineBanner({
         </Animated.View>
     );
 }
+
+// Memoize to prevent re-renders when parent updates
+export const OfflineBanner = memo(OfflineBannerComponent, (prevProps, nextProps) => {
+    return (
+        prevProps.isOnline === nextProps.isOnline &&
+        prevProps.pendingCount === nextProps.pendingCount &&
+        prevProps.isSyncing === nextProps.isSyncing &&
+        prevProps.syncError === nextProps.syncError
+    );
+});
 
 const styles = StyleSheet.create({
     container: {
@@ -153,10 +142,10 @@ const styles = StyleSheet.create({
         paddingBottom: 12,
         paddingHorizontal: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
     },
     content: {
         flexDirection: 'row',

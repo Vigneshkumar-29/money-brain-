@@ -28,6 +28,8 @@ export class OfflineQueue {
     private static instance: OfflineQueue;
     private queue: PendingTransaction[] = [];
     private isLoaded = false;
+    private loadingPromise: Promise<void> | null = null;
+    private savingPromise: Promise<void> | null = null;
 
     private constructor() { }
 
@@ -39,15 +41,39 @@ export class OfflineQueue {
     }
 
     /**
-     * Load queue from storage
+     * Load queue from storage with lock mechanism
      */
-    async load(): Promise<void> {
-        if (this.isLoaded) return;
+    async load(forceReload = false): Promise<void> {
+        if (this.isLoaded && !forceReload) return;
 
+        // If already loading, wait for it
+        if (this.loadingPromise) {
+            await this.loadingPromise;
+            return;
+        }
+
+        this.loadingPromise = this._loadFromStorage();
+        try {
+            await this.loadingPromise;
+        } finally {
+            this.loadingPromise = null;
+        }
+    }
+
+    private async _loadFromStorage(): Promise<void> {
         try {
             const stored = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
             if (stored) {
-                this.queue = JSON.parse(stored);
+                const parsed = JSON.parse(stored);
+                // Validate the parsed data is an array
+                if (Array.isArray(parsed)) {
+                    this.queue = parsed;
+                } else {
+                    console.error('Invalid queue data format, resetting queue');
+                    this.queue = [];
+                }
+            } else {
+                this.queue = [];
             }
             this.isLoaded = true;
         } catch (error) {
@@ -58,9 +84,23 @@ export class OfflineQueue {
     }
 
     /**
-     * Save queue to storage
+     * Save queue to storage with lock mechanism
      */
     private async save(): Promise<void> {
+        // Wait for any pending save to complete first
+        if (this.savingPromise) {
+            await this.savingPromise;
+        }
+
+        this.savingPromise = this._saveToStorage();
+        try {
+            await this.savingPromise;
+        } finally {
+            this.savingPromise = null;
+        }
+    }
+
+    private async _saveToStorage(): Promise<void> {
         try {
             await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(this.queue));
         } catch (error) {
