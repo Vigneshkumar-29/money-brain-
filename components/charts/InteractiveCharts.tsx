@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { View, Text, Pressable, Animated, Dimensions, LayoutChangeEvent, StyleSheet } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -31,7 +31,63 @@ interface InteractiveCategoryChartProps {
 }
 
 /**
- * Interactive Bar Chart with touch feedback and animations
+ * Single Bar Component - Renders immediately and animates
+ */
+const Bar = memo(({
+    heightPercent,
+    width,
+    color,
+    isSelected,
+    isIncome,
+    animationDelay
+}: {
+    heightPercent: number;
+    width: number;
+    color: string;
+    isSelected: boolean;
+    isIncome: boolean;
+    animationDelay: number;
+}) => {
+    const heightAnim = useRef(new Animated.Value(heightPercent)).current;
+
+    useEffect(() => {
+        // Animate to target height
+        Animated.timing(heightAnim, {
+            toValue: heightPercent,
+            duration: 300,
+            delay: animationDelay,
+            useNativeDriver: false,
+        }).start();
+    }, [heightPercent, animationDelay]);
+
+    return (
+        <Animated.View
+            style={{
+                width: width,
+                height: heightAnim.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ['0%', '100%'],
+                    extrapolate: 'clamp',
+                }),
+                backgroundColor: color,
+                borderTopLeftRadius: 6,
+                borderTopRightRadius: 6,
+                transform: [{ scale: isSelected ? 1.08 : 1 }],
+                minHeight: 4,
+                ...(isIncome && {
+                    shadowColor: color,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: isSelected ? 0.8 : 0.4,
+                    shadowRadius: isSelected ? 12 : 6,
+                    elevation: isSelected ? 6 : 3,
+                }),
+            }}
+        />
+    );
+});
+
+/**
+ * Interactive Bar Chart - Renders immediately on mount
  */
 export function InteractiveBarChart({
     data,
@@ -42,40 +98,42 @@ export function InteractiveBarChart({
 }: InteractiveBarChartProps) {
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [chartWidth, setChartWidth] = useState(SCREEN_WIDTH - 80);
-    const animatedValues = useRef(data.map(() => new Animated.Value(0))).current;
 
     // Calculate max value for scaling
-    const maxValue = Math.max(
-        ...data.map(d => Math.max(d.income, d.expense)),
-        1
+    const maxValue = useMemo(() =>
+        Math.max(...data.map(d => Math.max(d.income, d.expense)), 1),
+        [data]
     );
 
-    // Animate bars on mount and data change
-    useEffect(() => {
-        // Reset and animate
-        animatedValues.forEach((av, index) => {
-            av.setValue(0);
-            Animated.spring(av, {
-                toValue: 1,
-                tension: 50,
-                friction: 8,
-                useNativeDriver: false,
-                delay: index * 100,
-            }).start();
-        });
-    }, [data]);
+    // Calculate bar width
+    const barWidth = useMemo(() =>
+        Math.min((chartWidth / Math.max(data.length, 1)) - 16, 40),
+        [chartWidth, data.length]
+    );
 
-    const handleLayout = (event: LayoutChangeEvent) => {
+    // Pre-calculate all bar heights as percentages
+    const barHeights = useMemo(() => data.map(week => ({
+        expensePercent: week.expense > 0 ? Math.max((week.expense / maxValue) * 100, 5) : 5,
+        incomePercent: week.income > 0 ? Math.max((week.income / maxValue) * 100, 5) : 5,
+    })), [data, maxValue]);
+
+    const handleLayout = useCallback((event: LayoutChangeEvent) => {
         setChartWidth(event.nativeEvent.layout.width);
-    };
+    }, []);
 
-    const barWidth = Math.min((chartWidth / data.length) - 16, 40);
+    if (data.length === 0) {
+        return (
+            <View style={[styles.chartArea, { height, justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={styles.emptyText}>No data available</Text>
+            </View>
+        );
+    }
 
     return (
         <View onLayout={handleLayout}>
             {/* Tooltip for selected bar */}
             {selectedIndex !== null && data[selectedIndex] && (
-                <View style={[styles.tooltipContainer]}>
+                <View style={styles.tooltipContainer}>
                     <View style={styles.tooltip}>
                         <Text style={styles.tooltipTitle}>
                             {data[selectedIndex].label}
@@ -98,18 +156,15 @@ export function InteractiveBarChart({
                 </View>
             )}
 
-            {/* Chart Area */}
+            {/* Chart Area - Renders immediately */}
             <View style={[styles.chartArea, { height }]}>
                 {data.map((week, index) => {
-                    const hasData = week.income > 0 || week.expense > 0;
-                    const expenseHeightPercent = hasData ? (week.expense / maxValue) * 100 : 5;
-                    const incomeHeightPercent = hasData ? (week.income / maxValue) * 100 : 5;
-
                     const isSelected = selectedIndex === index;
+                    const heights = barHeights[index];
 
                     return (
                         <Pressable
-                            key={index}
+                            key={`bar-${index}`}
                             onPressIn={() => setSelectedIndex(index)}
                             onPressOut={() => setSelectedIndex(null)}
                             style={styles.barContainer}
@@ -124,37 +179,22 @@ export function InteractiveBarChart({
                                 ]}
                             >
                                 {/* Expense Bar */}
-                                <Animated.View
-                                    style={{
-                                        width: barWidth / 2 - 1,
-                                        height: animatedValues[index]?.interpolate({
-                                            inputRange: [0, 1],
-                                            outputRange: ['0%', `${Math.max(expenseHeightPercent, 5)}%`]
-                                        }) || '5%',
-                                        backgroundColor: expenseColor,
-                                        borderTopLeftRadius: 4,
-                                        borderTopRightRadius: 4,
-                                        transform: isSelected ? [{ scale: 1.1 }] : [{ scale: 1 }],
-                                    }}
+                                <Bar
+                                    width={barWidth / 2 - 1}
+                                    heightPercent={heights.expensePercent}
+                                    color={expenseColor}
+                                    isSelected={isSelected}
+                                    isIncome={false}
+                                    animationDelay={index * 50}
                                 />
                                 {/* Income Bar */}
-                                <Animated.View
-                                    style={{
-                                        width: barWidth / 2 - 1,
-                                        height: animatedValues[index]?.interpolate({
-                                            inputRange: [0, 1],
-                                            outputRange: ['0%', `${Math.max(incomeHeightPercent, 5)}%`]
-                                        }) || '5%',
-                                        backgroundColor: incomeColor,
-                                        borderTopLeftRadius: 4,
-                                        borderTopRightRadius: 4,
-                                        shadowColor: incomeColor,
-                                        shadowOffset: { width: 0, height: 0 },
-                                        shadowOpacity: isSelected ? 0.8 : 0.4,
-                                        shadowRadius: isSelected ? 16 : 8,
-                                        elevation: isSelected ? 8 : 4,
-                                        transform: isSelected ? [{ scale: 1.1 }] : [{ scale: 1 }],
-                                    }}
+                                <Bar
+                                    width={barWidth / 2 - 1}
+                                    heightPercent={heights.incomePercent}
+                                    color={incomeColor}
+                                    isSelected={isSelected}
+                                    isIncome={true}
+                                    animationDelay={index * 50}
                                 />
                             </View>
                             <Text
@@ -174,7 +214,53 @@ export function InteractiveBarChart({
 }
 
 /**
- * Interactive Category Chart with touch feedback and animations
+ * Progress Bar Component - Renders immediately
+ */
+const ProgressBar = memo(({
+    percentage,
+    color,
+    delay
+}: {
+    percentage: number;
+    color: string;
+    delay: number;
+}) => {
+    const widthAnim = useRef(new Animated.Value(percentage)).current;
+
+    useEffect(() => {
+        Animated.timing(widthAnim, {
+            toValue: percentage,
+            duration: 400,
+            delay: delay,
+            useNativeDriver: false,
+        }).start();
+    }, [percentage, delay]);
+
+    return (
+        <View style={styles.progressBarBg}>
+            <Animated.View
+                style={{
+                    height: '100%',
+                    width: widthAnim.interpolate({
+                        inputRange: [0, 100],
+                        outputRange: ['0%', '100%'],
+                        extrapolate: 'clamp',
+                    }),
+                    backgroundColor: color,
+                    borderRadius: 5,
+                    shadowColor: color,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.5,
+                    shadowRadius: 4,
+                    minWidth: 4,
+                }}
+            />
+        </View>
+    );
+});
+
+/**
+ * Interactive Category Chart - Renders immediately on mount
  */
 export function InteractiveCategoryChart({
     data,
@@ -182,23 +268,6 @@ export function InteractiveCategoryChart({
     totalExpense
 }: InteractiveCategoryChartProps) {
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-    const animatedValues = useRef(data.map(() => new Animated.Value(0))).current;
-
-    // Animate progress bars
-    useEffect(() => {
-        // Reset and animate
-        data.forEach((item, index) => {
-            if (animatedValues[index]) {
-                animatedValues[index].setValue(0);
-                Animated.timing(animatedValues[index], {
-                    toValue: item.percentage,
-                    duration: 800,
-                    delay: index * 150,
-                    useNativeDriver: false,
-                }).start();
-            }
-        });
-    }, [data]);
 
     if (data.length === 0) {
         return (
@@ -215,100 +284,92 @@ export function InteractiveCategoryChart({
 
                 return (
                     <Pressable
-                        key={index}
+                        key={`category-${index}`}
                         onPressIn={() => setSelectedIndex(index)}
                         onPressOut={() => setSelectedIndex(null)}
-                        style={[
-                            styles.categoryItem,
-                            {
-                                backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'transparent',
-                                transform: [{ scale: isSelected ? 1.02 : 1 }],
-                            }
-                        ]}
                     >
-                        {/* Category Header */}
-                        <View style={styles.categoryHeader}>
-                            <View style={styles.categoryLabelContainer}>
-                                <View
-                                    style={[
-                                        styles.categoryDot,
-                                        {
-                                            backgroundColor: item.color,
-                                            shadowColor: item.color,
-                                            shadowOpacity: isSelected ? 0.8 : 0.6,
-                                            shadowRadius: isSelected ? 12 : 8,
-                                        }
-                                    ]}
-                                />
-                                <Text style={[
-                                    styles.categoryLabel,
-                                    { color: isSelected ? '#ffffff' : '#e5e7eb' }
-                                ]}>
-                                    {item.label}
-                                </Text>
-                            </View>
-                            <View style={styles.categoryValueContainer}>
-                                <Text style={styles.categoryValue}>
-                                    {formatCurrency(item.value)}
-                                </Text>
-                                <View
-                                    style={[
-                                        styles.percentageBadge,
-                                        { backgroundColor: `${item.color}30` }
-                                    ]}
-                                >
-                                    <Text style={[styles.percentageText, { color: item.color }]}>
-                                        {item.percentage.toFixed(1)}%
+                        <View
+                            style={[
+                                styles.categoryItem,
+                                {
+                                    backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'transparent',
+                                    transform: [{ scale: isSelected ? 1.02 : 1 }],
+                                }
+                            ]}
+                        >
+                            {/* Category Header */}
+                            <View style={styles.categoryHeader}>
+                                <View style={styles.categoryLabelContainer}>
+                                    <View
+                                        style={[
+                                            styles.categoryDot,
+                                            {
+                                                backgroundColor: item.color,
+                                                shadowColor: item.color,
+                                                shadowOpacity: isSelected ? 0.8 : 0.6,
+                                                shadowRadius: isSelected ? 12 : 8,
+                                            }
+                                        ]}
+                                    />
+                                    <Text style={[
+                                        styles.categoryLabel,
+                                        { color: isSelected ? '#ffffff' : '#e5e7eb' }
+                                    ]}>
+                                        {item.label}
                                     </Text>
                                 </View>
+                                <View style={styles.categoryValueContainer}>
+                                    <Text style={styles.categoryValue}>
+                                        {formatCurrency(item.value)}
+                                    </Text>
+                                    <View
+                                        style={[
+                                            styles.percentageBadge,
+                                            { backgroundColor: `${item.color}30` }
+                                        ]}
+                                    >
+                                        <Text style={[styles.percentageText, { color: item.color }]}>
+                                            {item.percentage.toFixed(1)}%
+                                        </Text>
+                                    </View>
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Progress Bar */}
-                        <View style={styles.progressBarBg}>
-                            <Animated.View
-                                style={{
-                                    height: '100%',
-                                    width: animatedValues[index]?.interpolate({
-                                        inputRange: [0, 100],
-                                        outputRange: ['0%', '100%']
-                                    }) || '0%',
-                                    backgroundColor: item.color,
-                                    borderRadius: 6,
-                                    shadowColor: item.color,
-                                    shadowOffset: { width: 0, height: 0 },
-                                    shadowOpacity: 0.5,
-                                    shadowRadius: 4,
-                                }}
+                            {/* Progress Bar - Renders immediately */}
+                            <ProgressBar
+                                percentage={item.percentage}
+                                color={item.color}
+                                delay={index * 60}
                             />
-                        </View>
 
-                        {/* Expanded Details on Selection */}
-                        {isSelected && (
-                            <View style={styles.expandedDetails}>
-                                <Text style={styles.detailText}>
-                                    {((item.value / totalExpense) * 100).toFixed(1)}% of total spending
-                                </Text>
-                                <Text style={styles.detailText}>
-                                    Avg: {formatCurrency(item.value / 30)}/day
-                                </Text>
-                            </View>
-                        )}
+                            {/* Expanded Details on Selection */}
+                            {isSelected && totalExpense > 0 && (
+                                <View style={styles.expandedDetails}>
+                                    <Text style={styles.detailText}>
+                                        {((item.value / totalExpense) * 100).toFixed(1)}% of total
+                                    </Text>
+                                    <Text style={styles.detailText}>
+                                        ~{formatCurrency(item.value / 30)}/day
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </Pressable>
                 );
             })}
 
-            {/* Summary Bar showing all categories */}
+            {/* Summary Bar */}
             <View style={styles.summarySection}>
                 <Text style={styles.summaryLabel}>Spending Distribution</Text>
                 <View style={styles.summaryBar}>
                     {data.map((item, index) => (
                         <View
-                            key={index}
+                            key={`summary-${index}`}
                             style={{
                                 width: `${item.percentage}%`,
                                 backgroundColor: item.color,
                                 height: '100%',
+                                minWidth: 2,
                             }}
                         />
                     ))}
@@ -382,7 +443,7 @@ const styles = StyleSheet.create({
     barGroup: {
         flexDirection: 'row',
         justifyContent: 'center',
-        gap: 2,
+        gap: 3,
         alignItems: 'flex-end',
     },
     barLabel: {
@@ -393,7 +454,7 @@ const styles = StyleSheet.create({
 
     // Category Chart Styles
     categoryContainer: {
-        gap: 16,
+        gap: 12,
     },
     categoryItem: {
         gap: 8,
@@ -441,10 +502,10 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     progressBarBg: {
-        height: 12,
+        height: 10,
         width: '100%',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 6,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 5,
         overflow: 'hidden',
     },
     expandedDetails: {
