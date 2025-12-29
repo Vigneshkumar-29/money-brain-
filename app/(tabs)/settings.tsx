@@ -1,4 +1,4 @@
-import { View, Text, Switch, TouchableOpacity } from 'react-native';
+import { View, Text, Switch, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
 import { useColorScheme } from 'nativewind';
@@ -42,7 +42,11 @@ export default function Settings() {
 
   return (
     <SafeAreaView className="flex-1 bg-background-light dark:bg-background-dark">
-      <View className="flex-1 px-5 pt-6">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
         <FadeInView delay={0}>
           <Text className="text-3xl font-display font-bold text-text-primary dark:text-text-dark mb-8">Settings</Text>
         </FadeInView>
@@ -102,7 +106,7 @@ export default function Settings() {
             <Text className="ml-2 text-base font-display font-bold text-red-500">Log Out</Text>
           </TouchableOpacity>
         </FadeInView>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
